@@ -11,7 +11,6 @@ import { useMemo } from "react";
 import type { TripPath } from "../../types/trip.type";
 import { generateOctilinearPaths } from "../../utils/path";
 import { convertToStopPositions, layoutRouteStops } from "../../utils/sugiyama";
-import { straightenPath } from "../../utils/smooth-path";
 
 const INITIAL_VIEW_STATE: OrthographicViewState = {
   target: [400, 0, 0],
