@@ -14,7 +14,7 @@ export const TripFilter = ({
     <div
       style={{
         position: "absolute",
-        top: 20,
+        bottom: 20,
         left: 20,
         background: "rgba(15, 23, 42, 0.95)",
         border: "1px solid rgba(255, 255, 255, 0.1)",
