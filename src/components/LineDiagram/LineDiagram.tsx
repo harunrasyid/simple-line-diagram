@@ -17,6 +17,13 @@ const INITIAL_VIEW_STATE: OrthographicViewState = {
   zoom: 1.2,
 };
 
+const LAYOUT_OPTIONS = {
+  stopSpacing: 100, // Horizontal spacing
+  laneHeight: 60, // Vertical offset for branches
+  inboundY: -200, // Y position for inbound line
+  outboundY: 0, // Y position for outbound line
+};
+
 export const LineDiagram = ({
   routeData,
   visibleTrip,
@@ -24,22 +31,19 @@ export const LineDiagram = ({
   controller = true,
   ...props
 }: LineDiagramProps) => {
-  const stationPositions = useMemo(
-    () =>
-      convertToStopPositions(
-        layoutRouteStops(routeData, {
-          stopSpacing: 100, // Horizontal spacing
-          laneHeight: 60, // Vertical offset for branches
-          inboundY: -200, // Y position for inbound line
-          outboundY: 0, // Y position for outbound line
-        })
-      ),
+  const layout = useMemo(
+    () => layoutRouteStops(routeData, LAYOUT_OPTIONS),
     [routeData]
   );
 
+  const stationPositions = useMemo(
+    () => convertToStopPositions(layout),
+    [layout]
+  );
+
   const routePaths = useMemo(
-    () => generateOctilinearPaths(routeData.trips, stationPositions),
-    [routeData.trips, stationPositions]
+    () => generateOctilinearPaths(routeData.trips, stationPositions, layout, LAYOUT_OPTIONS),
+    [routeData.trips, stationPositions, layout]
   );
 
   console.log(stationPositions);
