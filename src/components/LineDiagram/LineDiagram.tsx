@@ -97,7 +97,7 @@ export const LineDiagram = ({
         const pos = stationPositions[d.id];
         return [pos.x, pos.y - 25, 0];
       },
-      getText: (d: Stop) => `${d.name} - ${d.id}`,
+      getText: (d: Stop) => `${d.name}`,
       getSize: 12,
       getColor: [255, 255, 255],
       getAlignmentBaseline: "bottom",

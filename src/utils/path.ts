@@ -100,6 +100,9 @@ export const generateOctilinearPaths = (
           conn ? { isExpress: conn.isExpress, lane: conn.lane } : "not found",
         );
 
+        const dx = next.x - current.x;
+        const dy = next.y - current.y;
+
         // Check if this is an express connection that needs to route around stops
         if (conn && conn.isExpress && tripLane) {
           const tripLaneY =
@@ -113,55 +116,45 @@ export const generateOctilinearPaths = (
 
           // Only route differently if the trip's lane is different from the stop's y
           if (Math.abs(tripLaneY - current.y) > 1) {
-            // Detour to the trip's lane to avoid crossing stops
-            // 1. Move diagonally from current stop to the trip's lane
-            const detourX1 = current.x + Math.abs(tripLaneY - current.y);
+            // Detour to the trip's lane to avoid crossing stops using 90-degree angles
+            // 1. Move horizontally a small amount first
+            const horizontalOffset = 20; // Small offset before turning
+            const detourX1 = current.x + horizontalOffset;
+            path.push([detourX1, current.y, 0]);
+
+            // 2. Move vertically to the trip's lane (90-degree turn)
             path.push([detourX1, tripLaneY, 0]);
 
-            // 2. Move horizontally along the trip's lane
-            const detourX2 = next.x - Math.abs(tripLaneY - next.y);
+            // 3. Move horizontally along the trip's lane
+            const detourX2 = next.x - horizontalOffset;
             if (detourX2 > detourX1) {
               path.push([detourX2, tripLaneY, 0]);
             }
 
-            console.log(
-              `[Path] Detour points: (${detourX1}, ${tripLaneY}), (${detourX2}, ${tripLaneY})`,
-            );
+            // 4. Move vertically to align with next stop's y (90-degree turn)
+            path.push([detourX2 > detourX1 ? detourX2 : detourX1, next.y, 0]);
 
-            // 3. Move diagonally to the next stop (will be added in next iteration or as final point)
-          } else {
-            // No detour needed, just add diagonal smoothing if needed
-            const dx = next.x - current.x;
-            const dy = next.y - current.y;
-            if (dx !== 0 && dy !== 0) {
-              const steps = Math.max(Math.abs(dx), Math.abs(dy)) / 100;
-              const stepX = dx / steps;
-              const stepY = dy / steps;
-              for (let step = 1; step < steps; step++) {
-                path.push([
-                  current.x + stepX * step,
-                  current.y + stepY * step,
-                  0,
-                ]);
-              }
-            }
+            console.log(
+              `[Path] 90-degree detour points: (${detourX1}, ${current.y}), (${detourX1}, ${tripLaneY}), (${detourX2}, ${tripLaneY}), (${detourX2}, ${next.y})`,
+            );
+          } else if (dy !== 0) {
+            // Same lane but different y - use 90-degree routing
+            // Go horizontal first, then vertical
+            const midX = current.x + dx / 2;
+            path.push([midX, current.y, 0]);
+            path.push([midX, next.y, 0]);
           }
         } else {
-          // Regular connection - add diagonal smoothing if needed
-          const dx = next.x - current.x;
-          const dy = next.y - current.y;
-          if (dx !== 0 && dy !== 0) {
-            const steps = Math.max(Math.abs(dx), Math.abs(dy)) / 100;
-            const stepX = dx / steps;
-            const stepY = dy / steps;
-            for (let step = 1; step < steps; step++) {
-              path.push([
-                current.x + stepX * step,
-                current.y + stepY * step,
-                0,
-              ]);
-            }
+          // Regular connection - use 90-degree routing if lanes differ
+          if (dy !== 0 && dx !== 0) {
+            // 90-degree routing: horizontal first, then vertical
+            // Use midpoint for cleaner appearance
+            const midX = current.x + dx / 2;
+            path.push([midX, current.y, 0]);
+            path.push([midX, next.y, 0]);
           }
+          // If only horizontal (dy === 0), no intermediate points needed
+          // The line will go straight from current to next
         }
       }
     }
