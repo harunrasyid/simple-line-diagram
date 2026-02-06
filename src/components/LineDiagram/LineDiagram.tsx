@@ -33,17 +33,23 @@ export const LineDiagram = ({
 }: LineDiagramProps) => {
   const layout = useMemo(
     () => layoutRouteStops(routeData, LAYOUT_OPTIONS),
-    [routeData]
+    [routeData],
   );
 
   const stationPositions = useMemo(
     () => convertToStopPositions(layout),
-    [layout]
+    [layout],
   );
 
   const routePaths = useMemo(
-    () => generateOctilinearPaths(routeData.trips, stationPositions, layout, LAYOUT_OPTIONS),
-    [routeData.trips, stationPositions, layout]
+    () =>
+      generateOctilinearPaths(
+        routeData.trips,
+        stationPositions,
+        layout,
+        LAYOUT_OPTIONS,
+      ),
+    [routeData.trips, stationPositions, layout],
   );
 
   console.log(stationPositions);
@@ -55,7 +61,7 @@ export const LineDiagram = ({
     new PathLayer({
       id: "route-paths",
       data: routePaths.filter((r) =>
-        visibleTrip.some((visibleTrip) => r.id === visibleTrip.id)
+        visibleTrip.some((visibleTrip) => r.id === visibleTrip.id),
       ),
       getPath: (d: TripPath) => [...d.inboundPath, ...d.outboundPath],
       getColor: (d: TripPath) => [...d.color],
