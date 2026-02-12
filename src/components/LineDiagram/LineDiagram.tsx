@@ -7,21 +7,12 @@ import DeckGL, {
 } from "deck.gl";
 import type { LineDiagramProps } from "./LineDiagram.props";
 import type { Stop } from "../../types/stop.type";
-import { useMemo } from "react";
 import type { TripPath } from "../../types/trip.type";
-import { generateOctilinearPaths } from "../../utils/path";
-import { convertToStopPositions, layoutRouteStops } from "../../utils/sugiyama";
+import { useGraphLayout } from "./useGraphLayout";
 
 const INITIAL_VIEW_STATE: OrthographicViewState = {
   target: [400, 0, 0],
   zoom: 1.2,
-};
-
-const LAYOUT_OPTIONS = {
-  stopSpacing: 100, // Horizontal spacing
-  laneHeight: 60, // Vertical offset for branches
-  inboundY: -200, // Y position for inbound line
-  outboundY: 0, // Y position for outbound line
 };
 
 export const LineDiagram = ({
@@ -31,29 +22,7 @@ export const LineDiagram = ({
   controller = true,
   ...props
 }: LineDiagramProps) => {
-  const layout = useMemo(
-    () => layoutRouteStops(routeData, LAYOUT_OPTIONS),
-    [routeData],
-  );
-
-  const stationPositions = useMemo(
-    () => convertToStopPositions(layout),
-    [layout],
-  );
-
-  const routePaths = useMemo(
-    () =>
-      generateOctilinearPaths(
-        routeData.trips,
-        stationPositions,
-        layout,
-        LAYOUT_OPTIONS,
-      ),
-    [routeData.trips, stationPositions, layout],
-  );
-
-  console.log(stationPositions);
-  console.log(routePaths);
+  const { stationPositions, routePaths } = useGraphLayout(routeData);
 
   // Create layers
   const layers = [

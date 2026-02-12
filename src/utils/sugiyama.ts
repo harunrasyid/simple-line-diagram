@@ -336,7 +336,7 @@ function assignLanes(
                 break;
               }
             }
-          }
+          } 
         }
         if (hasConflict) break;
       }

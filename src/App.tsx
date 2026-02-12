@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { RouteData } from "./types/route.type";
-import { LineDiagram } from "./components/LineDiagram/LineDiagram";
-import { TripFilter } from "./components/TripFilter/TripFilter";
 import type { Trip } from "./types/trip.type";
+import type { RendererType } from "./types/renderer.type";
+import { LineDiagramWrapper } from "./components/LineDiagram/LineDiagramWrapper";
+import { RendererSwitch } from "./components/RendererSwitch/RendererSwitch";
+import { TripFilter } from "./components/TripFilter/TripFilter";
 
 function App() {
   // Default empty route data
@@ -12,6 +14,7 @@ function App() {
   });
 
   const [visibleTrip, setVisibleTrip] = useState<Trip[]>([]);
+  const [rendererType, setRendererType] = useState<RendererType>("deckgl");
 
   const toggleRoute = (routeId: string): void => {
     setVisibleTrip((prev) => {
@@ -49,7 +52,19 @@ function App() {
     >
       {/* JSON Input Area */}
       <div style={{ padding: "10px", background: "#1e293b" }}>
-        <h3 style={{ marginBottom: "6px" }}>Paste Route JSON</h3>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "8px",
+            marginBottom: "6px",
+          }}
+        >
+          <h3 style={{ margin: 0 }}>Paste Route JSON</h3>
+          <RendererSwitch value={rendererType} onChange={setRendererType} />
+        </div>
         <textarea
           placeholder="Paste route JSON here..."
           onChange={handleJsonInput}
@@ -69,8 +84,12 @@ function App() {
       </div>
 
       {/* Line Diagram */}
-      <div style={{ flex: 1, position: "relative" }}>
-        <LineDiagram routeData={routeData} visibleTrip={visibleTrip} />
+      <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+        <LineDiagramWrapper
+          routeData={routeData}
+          visibleTrip={visibleTrip}
+          rendererType={rendererType}
+        />
       </div>
 
       {/* Trip Filter */}
