@@ -169,7 +169,7 @@ export const calculateDiagramLayout = (
   // Build route membership
   stops.forEach((s) => (stationRoutes[s.id] = new Set()));
   trips.forEach((trip) => {
-    [...trip.inbound, ...trip.outbound].forEach((stId) => {
+    [...trip.inboundStop, ...trip.outboundStop].forEach((stId) => {
       if (!stationRoutes[stId]) stationRoutes[stId] = new Set();
       stationRoutes[stId].add(trip.id);
     });
@@ -178,7 +178,7 @@ export const calculateDiagramLayout = (
   // Assign inbound (left → right)
   trips.forEach((trip, tripIndex) => {
     const yOffset = tripIndex * 20; // small vertical spacing between routes
-    trip.inbound.forEach((stId, idx) => {
+    trip.inboundStop.forEach((stId, idx) => {
       const existing = positions[stId];
       if (!existing) {
         positions[stId] = {
@@ -194,9 +194,9 @@ export const calculateDiagramLayout = (
   // Assign outbound (right → left)
   trips.forEach((trip, tripIndex) => {
     const yOffset = outboundOffset + tripIndex * 20;
-    const inboundLength = trip.inbound.length;
+    const inboundLength = trip.inboundStop.length;
 
-    trip.outbound.forEach((stId, idx) => {
+    trip.outboundStop.forEach((stId, idx) => {
       const mirroredX = (inboundLength - 1 - idx) * GRID_SIZE;
 
       const existing = positions[stId];

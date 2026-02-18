@@ -10,6 +10,7 @@ export const LAYOUT_OPTIONS = {
   laneHeight: 60,
   inboundY: -200,
   outboundY: 0,
+  endStopY: -100,
 } as const;
 
 export interface GraphLayoutResult {
@@ -28,15 +29,20 @@ export function useGraphLayout(routeData: RouteData): GraphLayoutResult {
     [layout],
   );
 
+  const endStopIds = useMemo(
+    () => new Set(routeData.stops.filter((s) => s.endStop).map((s) => s.id)),
+    [routeData.stops],
+  );
+
   const routePaths = useMemo(
     () =>
       generateOctilinearPaths(
         routeData.trips,
         stationPositions,
         layout,
-        LAYOUT_OPTIONS,
+        { ...LAYOUT_OPTIONS, endStopIds },
       ),
-    [routeData.trips, stationPositions, layout],
+    [routeData.trips, stationPositions, layout, endStopIds],
   );
 
   return { stationPositions, routePaths };

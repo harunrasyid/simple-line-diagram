@@ -1,12 +1,32 @@
+export interface Segment {
+  id: string;
+  distance: number;
+  nextStop: string;
+  prevStop: string;
+  cumulativeDistance: number;
+}
+
 export interface Trip {
   id: string;
   name: string;
   color: [number, number, number];
-  outbound: string[];
-  inbound: string[];
+  outboundStop: string[];
+  inboundStop: string[];
+  outboundSegment: Segment[];
+  inboundSegment: Segment[];
+}
+
+export interface SegmentPath {
+  id: string;
+  tripId: string;
+  color: [number, number, number];
+  path: [number, number, number][];
+  prevStop: string;
+  nextStop: string;
+  direction: "inbound" | "outbound";
 }
 
 export interface TripPath extends Trip {
-  outboundPath: [number, number, number][];
-  inboundPath: [number, number, number][];
+  outboundSegmentPaths: SegmentPath[];
+  inboundSegmentPaths: SegmentPath[];
 }

@@ -7,7 +7,7 @@ async function generateSugiyamaLayout(route: RouteData) {
   const elk = new ELK();
 
   // Determine order (left→right) based on first outbound trip
-  const baseOrder = route.trips[0]?.outbound || route.stops.map((s) => s.id);
+  const baseOrder = route.trips[0]?.outboundStop || route.stops.map((s) => s.id);
   const orderMap = new Map(baseOrder.map((id, i) => [id, i]));
 
   // 1️⃣ Build nodes with layer order
@@ -35,8 +35,8 @@ async function generateSugiyamaLayout(route: RouteData) {
         });
       }
     };
-    addEdges(trip.outbound, "out");
-    addEdges(trip.inbound, "in");
+    addEdges(trip.outboundStop, "out");
+    addEdges(trip.inboundStop, "in");
   }
 
   const graph = {

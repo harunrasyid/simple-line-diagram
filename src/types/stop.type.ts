@@ -4,6 +4,7 @@ export interface Stop {
   name: string;
   lat?: number;
   lon?: number;
+  endStop?: string; // "true" if this is a terminal stop
 }
 
 // Data type for stop in orthographic coordinates

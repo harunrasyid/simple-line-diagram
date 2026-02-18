@@ -1,16 +1,81 @@
 import type { StopPositions } from "../types/stop.type";
-import type { Trip, TripPath } from "../types/trip.type";
+import type { Trip, TripPath, SegmentPath } from "../types/trip.type";
 import type { Connection, LayoutResult } from "./sugiyama";
 
 export interface PathGenerationOptions {
   laneHeight?: number;
   inboundY?: number;
   outboundY?: number;
+  endStopIds?: Set<string>;
 }
 
 /**
- * Generate octilinear paths for trips, routing around stops when necessary
- * Uses the trip's assigned lane from connections for express routes
+ * Generate a single segment path from prevStop center to nextStop center
+ * using octilinear routing (express detours, 90-degree turns, end-stop routing).
+ */
+const generateSegmentPathPoints = (
+  prevPos: { x: number; y: number },
+  nextPos: { x: number; y: number },
+  prevStopId: string,
+  nextStopId: string,
+  conn: Connection | undefined,
+  tripLane: { inbound: number; outbound: number } | undefined,
+  direction: "inbound" | "outbound",
+  laneHeight: number,
+  baseY: number,
+  endStopIds: Set<string>,
+): [number, number, number][] => {
+  const path: [number, number, number][] = [];
+  path.push([prevPos.x, prevPos.y, 0]);
+
+  const dx = nextPos.x - prevPos.x;
+  const dy = nextPos.y - prevPos.y;
+
+  if (conn && conn.isExpress && tripLane) {
+    const tripLaneY =
+      direction === "inbound"
+        ? baseY - conn.lane * laneHeight
+        : baseY + conn.lane * laneHeight;
+
+    if (Math.abs(tripLaneY - prevPos.y) > 1) {
+      const horizontalOffset = 20;
+      const detourX1 = prevPos.x + horizontalOffset;
+      path.push([detourX1, prevPos.y, 0]);
+      path.push([detourX1, tripLaneY, 0]);
+      const detourX2 = nextPos.x - horizontalOffset;
+      if (detourX2 > detourX1) {
+        path.push([detourX2, tripLaneY, 0]);
+      }
+      path.push([detourX2 > detourX1 ? detourX2 : detourX1, nextPos.y, 0]);
+    } else if (dy !== 0) {
+      const midX = prevPos.x + dx / 2;
+      path.push([midX, prevPos.y, 0]);
+      path.push([midX, nextPos.y, 0]);
+    }
+  } else {
+    if (dy !== 0 && dx !== 0) {
+      const prevIsEndStop = endStopIds.has(prevStopId);
+      const nextIsEndStop = endStopIds.has(nextStopId);
+
+      if (prevIsEndStop || nextIsEndStop) {
+        const endStopX = prevIsEndStop ? prevPos.x : nextPos.x;
+        path.push([endStopX, prevPos.y, 0]);
+        path.push([endStopX, nextPos.y, 0]);
+      } else {
+        const midX = prevPos.x + dx / 2;
+        path.push([midX, prevPos.y, 0]);
+        path.push([midX, nextPos.y, 0]);
+      }
+    }
+  }
+
+  path.push([nextPos.x, nextPos.y, 0]);
+  return path;
+};
+
+/**
+ * Generate octilinear paths per segment for trips.
+ * Each segment path runs from the center of prevStop to the center of nextStop.
  */
 export const generateOctilinearPaths = (
   trips: Trip[],
@@ -18,11 +83,14 @@ export const generateOctilinearPaths = (
   layout?: LayoutResult,
   options: PathGenerationOptions = {},
 ): TripPath[] => {
-  const { laneHeight = 60, inboundY = -200, outboundY = 0 } = options;
+  const {
+    laneHeight = 60,
+    inboundY = -200,
+    outboundY = 0,
+    endStopIds = new Set<string>(),
+  } = options;
 
-  // Build a map of trip -> lane for each direction
   const tripLaneMap = new Map<string, { inbound: number; outbound: number }>();
-
   if (layout) {
     layout.connections.forEach((conn) => {
       const existing = tripLaneMap.get(conn.tripId) || {
@@ -38,7 +106,6 @@ export const generateOctilinearPaths = (
     });
   }
 
-  // Build a map of connections for each trip
   const tripConnections = new Map<
     string,
     { inbound: Connection[]; outbound: Connection[] }
@@ -58,122 +125,71 @@ export const generateOctilinearPaths = (
     });
   }
 
-  const generatePath = (
-    stopIds: string[],
+  const generateSegmentPaths = (
+    segments: { id: string; prevStop: string; nextStop: string }[],
     direction: "inbound" | "outbound",
     tripId: string,
-  ): [number, number, number][] => {
-    const validStops = stopIds.filter((id) => positions[id]);
-    const path: [number, number, number][] = [];
-
-    const tripLane = tripLaneMap.get(tripId);
-    const connections = tripConnections.get(tripId);
-    const dirConnections =
-      direction === "inbound" ? connections?.inbound : connections?.outbound;
+    color: [number, number, number],
+  ): SegmentPath[] => {
     const baseY = direction === "inbound" ? inboundY : outboundY;
+    const tripLane = tripLaneMap.get(tripId);
+    const dirConnections =
+      direction === "inbound"
+        ? tripConnections.get(tripId)?.inbound
+        : tripConnections.get(tripId)?.outbound;
 
-    console.log(
-      `[Path] Generating ${direction} path for trip ${tripId}:`,
-      validStops,
-    );
-    console.log(`[Path] Trip lane info:`, tripLane);
-    console.log(`[Path] Connections:`, dirConnections);
-
-    for (let i = 0; i < validStops.length; i++) {
-      const currentId = validStops[i];
-      const current = positions[currentId];
-
-      // Start from the stop's actual position
-      path.push([current.x, current.y, 0]);
-
-      if (i < validStops.length - 1) {
-        const nextId = validStops[i + 1];
-        const next = positions[nextId];
-
-        // Find the connection for this segment
+    return segments
+      .filter((seg) => positions[seg.prevStop] && positions[seg.nextStop])
+      .map((seg) => {
+        const prevPos = positions[seg.prevStop];
+        const nextPos = positions[seg.nextStop];
         const conn = dirConnections?.find(
-          (c) => c.from === currentId && c.to === nextId,
+          (c) => c.from === seg.prevStop && c.to === seg.nextStop,
         );
 
-        console.log(
-          `[Path] Connection ${currentId}->${nextId}:`,
-          conn ? { isExpress: conn.isExpress, lane: conn.lane } : "not found",
+        const path = generateSegmentPathPoints(
+          prevPos,
+          nextPos,
+          seg.prevStop,
+          seg.nextStop,
+          conn,
+          tripLane,
+          direction,
+          laneHeight,
+          baseY,
+          endStopIds,
         );
 
-        const dx = next.x - current.x;
-        const dy = next.y - current.y;
-
-        // Check if this is an express connection that needs to route around stops
-        if (conn && conn.isExpress && tripLane) {
-          const tripLaneY =
-            direction === "inbound"
-              ? baseY - conn.lane * laneHeight
-              : baseY + conn.lane * laneHeight;
-
-          console.log(
-            `[Path] Express connection: tripLaneY=${tripLaneY}, current.y=${current.y}, diff=${Math.abs(tripLaneY - current.y)}`,
-          );
-
-          // Only route differently if the trip's lane is different from the stop's y
-          if (Math.abs(tripLaneY - current.y) > 1) {
-            // Detour to the trip's lane to avoid crossing stops using 90-degree angles
-            // 1. Move horizontally a small amount first
-            const horizontalOffset = 20; // Small offset before turning
-            const detourX1 = current.x + horizontalOffset;
-            path.push([detourX1, current.y, 0]);
-
-            // 2. Move vertically to the trip's lane (90-degree turn)
-            path.push([detourX1, tripLaneY, 0]);
-
-            // 3. Move horizontally along the trip's lane
-            const detourX2 = next.x - horizontalOffset;
-            if (detourX2 > detourX1) {
-              path.push([detourX2, tripLaneY, 0]);
-            }
-
-            // 4. Move vertically to align with next stop's y (90-degree turn)
-            path.push([detourX2 > detourX1 ? detourX2 : detourX1, next.y, 0]);
-
-            console.log(
-              `[Path] 90-degree detour points: (${detourX1}, ${current.y}), (${detourX1}, ${tripLaneY}), (${detourX2}, ${tripLaneY}), (${detourX2}, ${next.y})`,
-            );
-          } else if (dy !== 0) {
-            // Same lane but different y - use 90-degree routing
-            // Go horizontal first, then vertical
-            const midX = current.x + dx / 2;
-            path.push([midX, current.y, 0]);
-            path.push([midX, next.y, 0]);
-          }
-        } else {
-          // Regular connection - use 90-degree routing if lanes differ
-          if (dy !== 0 && dx !== 0) {
-            // 90-degree routing: horizontal first, then vertical
-            // Use midpoint for cleaner appearance
-            const midX = current.x + dx / 2;
-            path.push([midX, current.y, 0]);
-            path.push([midX, next.y, 0]);
-          }
-          // If only horizontal (dy === 0), no intermediate points needed
-          // The line will go straight from current to next
-        }
-      }
-    }
-
-    console.log(`[Path] Final path for ${tripId}:`, path);
-    return path;
+        return {
+          id: seg.id,
+          tripId,
+          color,
+          path,
+          prevStop: seg.prevStop,
+          nextStop: seg.nextStop,
+          direction,
+        };
+      });
   };
 
   return trips.map((trip) => {
-    // Inbound: left → right
-    const inboundPath = generatePath(trip.inbound, "inbound", trip.id);
-
-    // Outbound: use mirrored positions directly (right → left visually)
-    const outboundPath = generatePath(trip.outbound, "outbound", trip.id);
+    const inboundSegmentPaths = generateSegmentPaths(
+      trip.inboundSegment,
+      "inbound",
+      trip.id,
+      trip.color,
+    );
+    const outboundSegmentPaths = generateSegmentPaths(
+      trip.outboundSegment,
+      "outbound",
+      trip.id,
+      trip.color,
+    );
 
     return {
       ...trip,
-      inboundPath,
-      outboundPath,
+      inboundSegmentPaths,
+      outboundSegmentPaths,
     };
   });
 };

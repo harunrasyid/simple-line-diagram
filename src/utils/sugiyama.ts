@@ -7,13 +7,14 @@ export interface Trip {
   id: string;
   name: string;
   color: [number, number, number];
-  outbound: string[];
-  inbound: string[];
+  outboundStop: string[];
+  inboundStop: string[];
 }
 
 export interface Stop {
   id: string;
   name: string;
+  endStop?: string;
 }
 
 export interface StopLayout {
@@ -23,7 +24,7 @@ export interface StopLayout {
   layer: number; // Horizontal layer (position in sequence)
   lane: number; // Vertical lane (for branches)
   name: string;
-  direction: "inbound" | "outbound" | "shared";
+  direction: "inbound" | "outbound" | "shared" | "endStop";
 }
 
 export interface Connection {
@@ -52,6 +53,7 @@ export function layoutRouteStops(
     laneHeight?: number;
     inboundY?: number;
     outboundY?: number;
+    endStopY?: number;
   } = {},
 ): LayoutResult {
   const {
@@ -59,7 +61,12 @@ export function layoutRouteStops(
     laneHeight = 60,
     inboundY = 200,
     outboundY = 0,
+    endStopY: endStopYOption,
   } = options;
+  const endStopY =
+    endStopYOption !== undefined
+      ? endStopYOption
+      : (inboundY + outboundY) / 2;
 
   const stopNameMap = new Map(routeData.stops.map((s) => [s.id, s.name]));
 
@@ -82,8 +89,68 @@ export function layoutRouteStops(
     outboundY,
   );
 
-  // Merge results and handle shared stops
-  const allStops = [...inboundResult.stops, ...outboundResult.stops];
+  // EndStop post-processing: place terminal stops on middle layer at left/right
+  const endStopIds = new Set(
+    routeData.stops.filter((s) => s.endStop).map((s) => s.id),
+  );
+
+  const inboundMaxX = Math.max(
+    ...inboundResult.stops.map((s) => s.x),
+    0,
+  );
+  const outboundMaxX = Math.max(
+    ...outboundResult.stops.map((s) => s.x),
+    0,
+  );
+  const globalMaxX = Math.max(inboundMaxX, outboundMaxX);
+
+  const inboundMaxLayer = Math.max(
+    ...inboundResult.stops.map((s) => s.layer),
+    0,
+  );
+
+  const endStopEntries: StopLayout[] = [];
+  for (const stop of routeData.stops) {
+    if (!endStopIds.has(stop.id)) continue;
+    const inboundStop = inboundResult.stops.find((s) => s.stopId === stop.id);
+    const layer =
+      inboundStop !== undefined
+        ? inboundStop.layer
+        : (() => {
+            const outboundStop = outboundResult.stops.find(
+              (s) => s.stopId === stop.id,
+            );
+            if (outboundStop === undefined) return 0;
+            const outboundMaxLayer = Math.max(
+              ...outboundResult.stops.map((s) => s.layer),
+              0,
+            );
+            return outboundMaxLayer - outboundStop.layer;
+          })();
+    const isLeftTerminus = layer === 0;
+    const x = isLeftTerminus ? 0 : globalMaxX;
+    endStopEntries.push({
+      stopId: stop.id,
+      x,
+      y: endStopY,
+      layer: isLeftTerminus ? 0 : inboundMaxLayer,
+      lane: 0,
+      name: stopNameMap.get(stop.id) ?? stop.id,
+      direction: "endStop",
+    });
+  }
+
+  const inboundFiltered = inboundResult.stops.filter(
+    (s) => !endStopIds.has(s.stopId),
+  );
+  const outboundFiltered = outboundResult.stops.filter(
+    (s) => !endStopIds.has(s.stopId),
+  );
+  const allStops = [
+    ...inboundFiltered,
+    ...outboundFiltered,
+    ...endStopEntries,
+  ];
   const allConnections = [
     ...inboundResult.connections,
     ...outboundResult.connections,
@@ -149,7 +216,7 @@ function buildGraph(trips: Trip[], direction: "inbound" | "outbound") {
   const nodes = new Set<string>();
 
   trips.forEach((trip) => {
-    const stops = direction === "inbound" ? trip.inbound : trip.outbound;
+    const stops = direction === "inbound" ? trip.inboundStop : trip.outboundStop;
 
     stops.forEach((stop) => nodes.add(stop));
 
@@ -246,7 +313,7 @@ function assignLanes(
   // Build a map of which stops each trip uses
   const tripStopsMap = new Map<string, string[]>();
   trips.forEach((trip) => {
-    const stops = direction === "inbound" ? trip.inbound : trip.outbound;
+    const stops = direction === "inbound" ? trip.inboundStop : trip.outboundStop;
     tripStopsMap.set(trip.id, stops);
   });
 
@@ -548,7 +615,7 @@ function buildConnections(
   );
 
   trips.forEach((trip) => {
-    const stops = direction === "inbound" ? trip.inbound : trip.outbound;
+    const stops = direction === "inbound" ? trip.inboundStop : trip.outboundStop;
     const tripLane = tripLanes.get(trip.id) || 0;
 
     console.log(`[buildConnections] Trip ${trip.id}: lane=${tripLane}`);

@@ -35,26 +35,31 @@ function drawGraph(
 ) {
   container.removeChildren();
 
-  // Paths layer
+  // Paths layer (one path per segment)
   const pathsGraphics = new Graphics();
   const visiblePaths = routePaths.filter((r) => visibleTripIds.has(r.id));
   for (const trip of visiblePaths) {
-    const path = [...trip.inboundPath, ...trip.outboundPath];
-    if (path.length < 2) continue;
-    const color = rgbToHex(trip.color);
-    pathsGraphics
-      .beginPath()
-      .setStrokeStyle({
-        width: LINE_WIDTH,
-        color,
-        cap: "round",
-        join: "round",
-      })
-      .moveTo(path[0][0], path[0][1]);
-    for (let i = 1; i < path.length; i++) {
-      pathsGraphics.lineTo(path[i][0], path[i][1]);
+    const allSegments = [
+      ...trip.inboundSegmentPaths,
+      ...trip.outboundSegmentPaths,
+    ];
+    for (const segment of allSegments) {
+      if (segment.path.length < 2) continue;
+      const color = rgbToHex(segment.color);
+      pathsGraphics
+        .beginPath()
+        .setStrokeStyle({
+          width: LINE_WIDTH,
+          color,
+          cap: "round",
+          join: "round",
+        })
+        .moveTo(segment.path[0][0], segment.path[0][1]);
+      for (let i = 1; i < segment.path.length; i++) {
+        pathsGraphics.lineTo(segment.path[i][0], segment.path[i][1]);
+      }
+      pathsGraphics.stroke();
     }
-    pathsGraphics.stroke();
   }
   container.addChild(pathsGraphics);
 
@@ -63,10 +68,15 @@ function drawGraph(
   const stopsWithPositions = stops.filter((s) => stationPositions[s.id]);
   for (const stop of stopsWithPositions) {
     const pos = stationPositions[stop.id];
-    const fillColor =
-      pos.tripIds.length > 1 ? rgbToHex([234, 179, 8]) : 0xffffff;
+    const isEndStop = Boolean(stop.endStop);
+    const radius = isEndStop ? STATION_RADIUS * 1.25 : STATION_RADIUS;
+    const fillColor = isEndStop
+      ? rgbToHex([100, 149, 237])
+      : pos.tripIds.length > 1
+        ? rgbToHex([234, 179, 8])
+        : 0xffffff;
     stationsGraphics
-      .circle(pos.x, pos.y, STATION_RADIUS)
+      .circle(pos.x, pos.y, radius)
       .fill({ color: fillColor })
       .stroke({ width: 3, color: 0x1e293b });
   }
