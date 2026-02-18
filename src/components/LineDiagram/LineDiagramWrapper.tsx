@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { RouteData } from "../../types/route.type";
 import type { Trip } from "../../types/trip.type";
+import type { Vehicle } from "../../types/vehicle.type";
 import type { RendererType } from "../../types/renderer.type";
 import { LineDiagram } from "./LineDiagram";
 import { LineDiagramPixi } from "./LineDiagramPixi";
@@ -8,12 +9,14 @@ import { LineDiagramPixi } from "./LineDiagramPixi";
 export interface LineDiagramWrapperProps {
   routeData: RouteData;
   visibleTrip: Trip[];
+  vehicles?: Vehicle[];
   rendererType: RendererType;
 }
 
 export function LineDiagramWrapper({
   routeData,
   visibleTrip,
+  vehicles = [],
   rendererType,
 }: LineDiagramWrapperProps) {
   const pixiContainerRef = useRef<HTMLDivElement | null>(null);
@@ -27,6 +30,7 @@ export function LineDiagramWrapper({
         <LineDiagramPixi
           routeData={routeData}
           visibleTrip={visibleTrip}
+          vehicles={vehicles}
           containerRef={pixiContainerRef}
         />
       </div>
@@ -34,6 +38,10 @@ export function LineDiagramWrapper({
   }
 
   return (
-    <LineDiagram routeData={routeData} visibleTrip={visibleTrip} />
+    <LineDiagram
+      routeData={routeData}
+      visibleTrip={visibleTrip}
+      vehicles={vehicles}
+    />
   );
 }

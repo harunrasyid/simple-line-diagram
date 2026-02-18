@@ -7,18 +7,23 @@ import {
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
 } from "react";
 import type { Stop } from "../../types/stop.type";
 import type { TripPath } from "../../types/trip.type";
 import type { StopPositions } from "../../types/stop.type";
 import { useGraphLayout } from "./useGraphLayout";
+import { resolveVehiclePosition, getVehicleTriangleVertices } from "../../utils/vehicle";
+import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
 import type { LineDiagramPixiProps } from "./LineDiagram.props";
 
 const LINE_WIDTH = 8;
 const STATION_RADIUS = 8;
 const LABEL_OFFSET_Y = -25;
 const LABEL_FONT_SIZE = 12;
+const VEHICLE_TRIANGLE_SIZE = 12;
+const VEHICLE_LABEL_FONT_SIZE = 10;
 const INITIAL_ZOOM = 1.2;
 const INITIAL_TARGET: [number, number] = [400, 0];
 
@@ -115,14 +120,32 @@ function drawGraph(
 export function LineDiagramPixi({
   routeData,
   visibleTrip,
+  vehicles = [],
   containerRef,
 }: LineDiagramPixiProps) {
   const { stationPositions, routePaths } = useGraphLayout(routeData);
   const appRef = useRef<Application | null>(null);
   const graphContainerRef = useRef<Container | null>(null);
+  const graphContentRef = useRef<Container | null>(null);
+  const vehiclesContainerRef = useRef<Container | null>(null);
   const viewStateRef = useRef({ target: [...INITIAL_TARGET], zoom: INITIAL_ZOOM });
   const isDraggingRef = useRef(false);
   const lastPointerRef = useRef({ x: 0, y: 0 });
+
+  const tripPathMap = useMemo(
+    () => new Map(routePaths.map((t) => [t.id, t])),
+    [routePaths],
+  );
+
+  const resolvedVehicles = useMemo(() => {
+    if (vehicles.length === 0) return [];
+    return vehicles
+      .map((v) => {
+        const tripPath = tripPathMap.get(v.tripId);
+        return tripPath ? resolveVehiclePosition(v, tripPath) : null;
+      })
+      .filter((r): r is ResolvedVehiclePosition => r !== null);
+  }, [vehicles, tripPathMap]);
 
   const updateView = useCallback(() => {
     const app = appRef.current;
@@ -157,7 +180,13 @@ export function LineDiagramPixi({
       appRef.current = app;
 
       const graphContainer = new Container();
+      const graphContent = new Container();
+      const vehiclesContainer = new Container();
+      graphContainer.addChild(graphContent);
+      graphContainer.addChild(vehiclesContainer);
       graphContainerRef.current = graphContainer;
+      graphContentRef.current = graphContent;
+      vehiclesContainerRef.current = vehiclesContainer;
       app.stage.addChild(graphContainer);
 
       viewStateRef.current = {
@@ -212,22 +241,74 @@ export function LineDiagramPixi({
         appRef.current = null;
       }
       graphContainerRef.current = null;
+      graphContentRef.current = null;
+      vehiclesContainerRef.current = null;
     };
   }, [containerRef, updateView]);
 
-  // Redraw when layout or visibility changes
+  // Redraw when layout or visibility changes (static graph only)
   useEffect(() => {
-    const graph = graphContainerRef.current;
-    if (!graph) return;
+    const graphContent = graphContentRef.current;
+    if (!graphContent) return;
     const visibleTripIds = new Set(visibleTrip.map((t) => t.id));
     drawGraph(
-      graph,
+      graphContent,
       stationPositions,
       routePaths,
       routeData.stops,
       visibleTripIds,
     );
   }, [stationPositions, routePaths, routeData.stops, visibleTrip]);
+
+  // Draw vehicles (separate layer, updates every tick)
+  useEffect(() => {
+    const vehiclesContainer = vehiclesContainerRef.current;
+    if (!vehiclesContainer) return;
+    vehiclesContainer.removeChildren();
+
+    for (const d of resolvedVehicles) {
+      const [nose, left, right] = getVehicleTriangleVertices(
+        d.x,
+        d.y,
+        d.angle,
+        VEHICLE_TRIANGLE_SIZE,
+      );
+      const fillColor = rgbToHex(d.color);
+      const tri = new Graphics();
+      tri
+        .moveTo(nose[0], nose[1])
+        .lineTo(left[0], left[1])
+        .lineTo(right[0], right[1])
+        .closePath()
+        .fill({ color: fillColor })
+        .stroke({ width: 1, color: 0x1e293b });
+      vehiclesContainer.addChild(tri);
+
+      const label = new Text({
+        text: d.vehicleId,
+        style: {
+          fontSize: VEHICLE_LABEL_FONT_SIZE,
+          fill: 0xffffff,
+        },
+      });
+      label.anchor.set(0.5, 1);
+      label.position.set(d.x, d.y - VEHICLE_TRIANGLE_SIZE - 4);
+      const bg = new Graphics();
+      const padding = 4;
+      const hPad = 2;
+      const w = label.width + padding * 2;
+      const h = label.height + hPad * 2;
+      bg.roundRect(
+        d.x - w / 2,
+        d.y - VEHICLE_TRIANGLE_SIZE - 4 - label.height - hPad,
+        w,
+        h,
+        4,
+      ).fill({ color: 0x0f172a, alpha: 220 / 255 });
+      vehiclesContainer.addChild(bg);
+      vehiclesContainer.addChild(label);
+    }
+  }, [resolvedVehicles]);
 
   // Sync view after first paint (in case resizeTo changed size)
   useEffect(() => {

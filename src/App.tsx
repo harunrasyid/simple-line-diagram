@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { RouteData } from "./types/route.type";
 import type { Trip } from "./types/trip.type";
 import type { RendererType } from "./types/renderer.type";
 import { LineDiagramWrapper } from "./components/LineDiagram/LineDiagramWrapper";
 import { RendererSwitch } from "./components/RendererSwitch/RendererSwitch";
 import { TripFilter } from "./components/TripFilter/TripFilter";
+import { useVehicleSimulation } from "./hooks/useVehicleSimulation";
 
 function App() {
   // Default empty route data
@@ -15,6 +16,11 @@ function App() {
 
   const [visibleTrip, setVisibleTrip] = useState<Trip[]>([]);
   const [rendererType, setRendererType] = useState<RendererType>("deckgl");
+  const vehicles = useVehicleSimulation(routeData, { speed: 15, tickMs: 150 });
+  const visibleVehicles = useMemo(
+    () => vehicles.filter((v) => visibleTrip.some((t) => t.id === v.tripId)),
+    [vehicles, visibleTrip],
+  );
 
   const toggleRoute = (routeId: string): void => {
     setVisibleTrip((prev) => {
@@ -88,6 +94,7 @@ function App() {
         <LineDiagramWrapper
           routeData={routeData}
           visibleTrip={visibleTrip}
+          vehicles={visibleVehicles}
           rendererType={rendererType}
         />
       </div>

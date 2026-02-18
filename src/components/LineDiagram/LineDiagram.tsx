@@ -1,23 +1,30 @@
 import DeckGL, {
   OrthographicView,
   PathLayer,
+  PolygonLayer,
   ScatterplotLayer,
   TextLayer,
   type OrthographicViewState,
 } from "deck.gl";
+import { useMemo } from "react";
 import type { LineDiagramProps } from "./LineDiagram.props";
 import type { Stop } from "../../types/stop.type";
 import type { SegmentPath } from "../../types/trip.type";
+import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
 import { useGraphLayout } from "./useGraphLayout";
+import { resolveVehiclePosition, getVehicleTriangleVertices } from "../../utils/vehicle";
 
 const INITIAL_VIEW_STATE: OrthographicViewState = {
   target: [400, 0, 0],
   zoom: 1.2,
 };
 
+const VEHICLE_TRIANGLE_SIZE = 12;
+
 export const LineDiagram = ({
   routeData,
   visibleTrip,
+  vehicles = [],
   initialViewState = INITIAL_VIEW_STATE,
   controller = true,
   ...props
@@ -25,11 +32,26 @@ export const LineDiagram = ({
   const { stationPositions, routePaths } = useGraphLayout(routeData);
 
   const allSegments = routePaths
-    .filter((r) => visibleTrip.some((v) => r.id === v.id))
+    .filter((r) => visibleTrip.some((t) => r.id === t.id))
     .flatMap((trip) => [
       ...trip.inboundSegmentPaths,
       ...trip.outboundSegmentPaths,
     ]);
+
+  const tripPathMap = useMemo(
+    () => new Map(routePaths.map((t) => [t.id, t])),
+    [routePaths],
+  );
+
+  const resolvedVehicles = useMemo((): ResolvedVehiclePosition[] => {
+    if (vehicles.length === 0) return [];
+    return vehicles
+      .map((v) => {
+        const tripPath = tripPathMap.get(v.tripId);
+        return tripPath ? resolveVehiclePosition(v, tripPath) : null;
+      })
+      .filter((r): r is ResolvedVehiclePosition => r !== null);
+  }, [vehicles, tripPathMap]);
 
   // Create layers
   const layers = [
@@ -81,6 +103,34 @@ export const LineDiagram = ({
       getBackgroundColor: [15, 23, 42, 200],
       backgroundPadding: [6, 3],
     }),
+
+    // Vehicles (triangles)
+    ...(resolvedVehicles.length > 0
+      ? [
+          new PolygonLayer({
+            id: "vehicles",
+            data: resolvedVehicles,
+            getPolygon: (d) =>
+              getVehicleTriangleVertices(d.x, d.y, d.angle, VEHICLE_TRIANGLE_SIZE),
+            getFillColor: (d: ResolvedVehiclePosition): [number, number, number, number] => [...d.color, 255],
+            getLineColor: [30, 41, 59],
+            lineWidthMinPixels: 1,
+          }),
+          new TextLayer({
+            id: "vehicle-labels",
+            data: resolvedVehicles,
+            getPosition: (d) => [d.x, d.y - VEHICLE_TRIANGLE_SIZE - 4, 0],
+            getText: (d) => d.vehicleId,
+            getSize: 10,
+            getColor: [255, 255, 255],
+            getAlignmentBaseline: "bottom",
+            getTextAnchor: "middle",
+            background: true,
+            getBackgroundColor: [15, 23, 42, 220],
+            backgroundPadding: [4, 2],
+          }),
+        ]
+      : []),
   ];
 
   return (
