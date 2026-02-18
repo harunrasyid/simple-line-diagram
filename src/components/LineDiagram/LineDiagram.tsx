@@ -12,14 +12,17 @@ import type { Stop } from "../../types/stop.type";
 import type { SegmentPath } from "../../types/trip.type";
 import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
 import { useGraphLayout } from "./useGraphLayout";
-import { resolveVehiclePosition, getVehicleTriangleVertices } from "../../utils/vehicle";
+import {
+  resolveVehiclePosition,
+  getVehicleTriangleVertices,
+} from "../../utils/vehicle";
 
 const INITIAL_VIEW_STATE: OrthographicViewState = {
   target: [400, 0, 0],
   zoom: 1.2,
 };
 
-const VEHICLE_TRIANGLE_SIZE = 12;
+const VEHICLE_TRIANGLE_SIZE = 18;
 
 export const LineDiagram = ({
   routeData,
@@ -111,8 +114,15 @@ export const LineDiagram = ({
             id: "vehicles",
             data: resolvedVehicles,
             getPolygon: (d) =>
-              getVehicleTriangleVertices(d.x, d.y, d.angle, VEHICLE_TRIANGLE_SIZE),
-            getFillColor: (d: ResolvedVehiclePosition): [number, number, number, number] => [...d.color, 255],
+              getVehicleTriangleVertices(
+                d.x,
+                d.y,
+                d.angle,
+                VEHICLE_TRIANGLE_SIZE,
+              ),
+            getFillColor: (): [number, number, number, number] => [
+              255, 255, 255, 255,
+            ],
             getLineColor: [30, 41, 59],
             lineWidthMinPixels: 1,
           }),

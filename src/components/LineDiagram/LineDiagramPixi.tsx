@@ -1,20 +1,13 @@
-import {
-  Application,
-  Container,
-  Graphics,
-  Text,
-} from "pixi.js";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { Application, Container, Graphics, Text } from "pixi.js";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Stop } from "../../types/stop.type";
 import type { TripPath } from "../../types/trip.type";
 import type { StopPositions } from "../../types/stop.type";
 import { useGraphLayout } from "./useGraphLayout";
-import { resolveVehiclePosition, getVehicleTriangleVertices } from "../../utils/vehicle";
+import {
+  resolveVehiclePosition,
+  getVehicleTriangleVertices,
+} from "../../utils/vehicle";
 import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
 import type { LineDiagramPixiProps } from "./LineDiagram.props";
 
@@ -22,7 +15,7 @@ const LINE_WIDTH = 8;
 const STATION_RADIUS = 8;
 const LABEL_OFFSET_Y = -25;
 const LABEL_FONT_SIZE = 12;
-const VEHICLE_TRIANGLE_SIZE = 12;
+const VEHICLE_TRIANGLE_SIZE = 18;
 const VEHICLE_LABEL_FONT_SIZE = 10;
 const INITIAL_ZOOM = 1.2;
 const INITIAL_TARGET: [number, number] = [400, 0];
@@ -110,8 +103,7 @@ function drawGraph(
       w,
       h,
       4,
-    )
-      .fill({ color: 0x0f172a, alpha: 200 / 255 });
+    ).fill({ color: 0x0f172a, alpha: 200 / 255 });
     container.addChild(bg);
     container.addChild(label);
   }
@@ -128,7 +120,10 @@ export function LineDiagramPixi({
   const graphContainerRef = useRef<Container | null>(null);
   const graphContentRef = useRef<Container | null>(null);
   const vehiclesContainerRef = useRef<Container | null>(null);
-  const viewStateRef = useRef({ target: [...INITIAL_TARGET], zoom: INITIAL_ZOOM });
+  const viewStateRef = useRef({
+    target: [...INITIAL_TARGET],
+    zoom: INITIAL_ZOOM,
+  });
   const isDraggingRef = useRef(false);
   const lastPointerRef = useRef({ x: 0, y: 0 });
 
@@ -221,17 +216,19 @@ export function LineDiagramPixi({
       });
 
       // Zoom (wheel)
-      container.addEventListener("wheel", (e) => {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        viewStateRef.current.zoom = Math.max(
-          0.3,
-          Math.min(3,
-            viewStateRef.current.zoom * (1 + delta),
-          ),
-        );
-        updateView();
-      }, { passive: false });
+      container.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          const delta = e.deltaY > 0 ? -0.1 : 0.1;
+          viewStateRef.current.zoom = Math.max(
+            0.3,
+            Math.min(3, viewStateRef.current.zoom * (1 + delta)),
+          );
+          updateView();
+        },
+        { passive: false },
+      );
     })();
 
     return () => {
@@ -273,7 +270,7 @@ export function LineDiagramPixi({
         d.angle,
         VEHICLE_TRIANGLE_SIZE,
       );
-      const fillColor = rgbToHex(d.color);
+      const fillColor = rgbToHex([255, 255, 255]);
       const tri = new Graphics();
       tri
         .moveTo(nose[0], nose[1])

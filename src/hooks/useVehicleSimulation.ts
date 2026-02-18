@@ -3,8 +3,8 @@ import type { RouteData } from "../types/route.type";
 import type { Vehicle } from "../types/vehicle.type";
 import { getMaxDistance } from "../utils/vehicle";
 
-const DEFAULT_SPEED = 15; // meters per tick
-const DEFAULT_TICK_MS = 150;
+const DEFAULT_SPEED = 1; // meters per tick
+const DEFAULT_TICK_MS = 100;
 
 export interface UseVehicleSimulationOptions {
   speed?: number;
