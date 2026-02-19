@@ -1,9 +1,10 @@
 import { Application, Container, Graphics, Text } from "pixi.js";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Stop } from "../../types/stop.type";
-import type { TripPath } from "../../types/trip.type";
 import type { StopPositions } from "../../types/stop.type";
+import type { TripPath, TurnaroundConnector } from "../../types/trip.type";
 import { useGraphLayout } from "./useGraphLayout";
+import { generateDiagonalHatchLines } from "../../utils/turnaround";
 import {
   resolveVehiclePosition,
   getVehicleTriangleVertices,
@@ -28,10 +29,39 @@ function drawGraph(
   container: Container,
   stationPositions: StopPositions,
   routePaths: TripPath[],
+  turnaroundConnectors: TurnaroundConnector[],
   stops: Stop[],
   visibleTripIds: Set<string>,
 ) {
   container.removeChildren();
+
+  // Turnaround hatched connectors (behind paths)
+  const turnaroundGraphics = new Graphics();
+  const visibleConnectors = turnaroundConnectors.filter((c) =>
+    visibleTripIds.has(c.tripId),
+  );
+  for (const connector of visibleConnectors) {
+    const fromPos = stationPositions[connector.fromStopId];
+    const toPos = stationPositions[connector.toStopId];
+    if (!fromPos || !toPos) continue;
+
+    const lines = generateDiagonalHatchLines(fromPos, toPos);
+    const color = rgbToHex(connector.color);
+
+    turnaroundGraphics.setStrokeStyle({
+      width: 1.5,
+      color,
+      alpha: 0.4,
+    });
+    for (const [x1, y1, x2, y2] of lines) {
+      turnaroundGraphics
+        .beginPath()
+        .moveTo(x1, y1)
+        .lineTo(x2, y2)
+        .stroke();
+    }
+  }
+  container.addChild(turnaroundGraphics);
 
   // Paths layer (one path per segment)
   const pathsGraphics = new Graphics();
@@ -115,7 +145,8 @@ export function LineDiagramPixi({
   vehicles = [],
   containerRef,
 }: LineDiagramPixiProps) {
-  const { stationPositions, routePaths } = useGraphLayout(routeData);
+  const { stationPositions, routePaths, turnaroundConnectors } =
+    useGraphLayout(routeData);
   const appRef = useRef<Application | null>(null);
   const graphContainerRef = useRef<Container | null>(null);
   const graphContentRef = useRef<Container | null>(null);
@@ -252,10 +283,17 @@ export function LineDiagramPixi({
       graphContent,
       stationPositions,
       routePaths,
+      turnaroundConnectors,
       routeData.stops,
       visibleTripIds,
     );
-  }, [stationPositions, routePaths, routeData.stops, visibleTrip]);
+  }, [
+    stationPositions,
+    routePaths,
+    turnaroundConnectors,
+    routeData.stops,
+    visibleTrip,
+  ]);
 
   // Draw vehicles (separate layer, updates every tick)
   useEffect(() => {

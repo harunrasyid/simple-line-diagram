@@ -12,6 +12,7 @@ import type { Stop } from "../../types/stop.type";
 import type { SegmentPath } from "../../types/trip.type";
 import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
 import { useGraphLayout } from "./useGraphLayout";
+import { generateDiagonalHatchLines } from "../../utils/turnaround";
 import {
   resolveVehiclePosition,
   getVehicleTriangleVertices,
@@ -32,7 +33,33 @@ export const LineDiagram = ({
   controller = true,
   ...props
 }: LineDiagramProps) => {
-  const { stationPositions, routePaths } = useGraphLayout(routeData);
+  const { stationPositions, routePaths, turnaroundConnectors } =
+    useGraphLayout(routeData);
+
+  const visibleTurnaroundConnectors = useMemo(
+    () =>
+      turnaroundConnectors.filter((c) =>
+        visibleTrip.some((t) => t.id === c.tripId),
+      ),
+    [turnaroundConnectors, visibleTrip],
+  );
+
+  const turnaroundHatchSegments = useMemo(
+    () =>
+      visibleTurnaroundConnectors.flatMap((c) => {
+        const fromPos = stationPositions[c.fromStopId];
+        const toPos = stationPositions[c.toStopId];
+        if (!fromPos || !toPos) return [];
+        return generateDiagonalHatchLines(fromPos, toPos).map((line) => ({
+          path: [
+            [line[0], line[1], 0],
+            [line[2], line[3], 0],
+          ] as [number, number, number][],
+          color: c.color,
+        }));
+      }),
+    [visibleTurnaroundConnectors, stationPositions],
+  );
 
   const allSegments = routePaths
     .filter((r) => visibleTrip.some((t) => r.id === t.id))
@@ -58,6 +85,23 @@ export const LineDiagram = ({
 
   // Create layers
   const layers = [
+    // Turnaround connectors (hatched diagonal lines, behind route paths)
+    ...(turnaroundHatchSegments.length > 0
+      ? [
+          new PathLayer({
+            id: "turnaround-connectors",
+            data: turnaroundHatchSegments,
+            getPath: (d: { path: [number, number, number][] }) => d.path,
+            getColor: (d: { color: [number, number, number] }) => [
+              ...d.color,
+              100,
+            ],
+            getWidth: 1.5,
+            widthMinPixels: 1,
+          }),
+        ]
+      : []),
+
     // Route paths with octilinear angles (one path per segment)
     new PathLayer({
       id: "route-paths",

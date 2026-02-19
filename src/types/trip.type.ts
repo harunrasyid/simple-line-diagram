@@ -30,3 +30,11 @@ export interface TripPath extends Trip {
   outboundSegmentPaths: SegmentPath[];
   inboundSegmentPaths: SegmentPath[];
 }
+
+export interface TurnaroundConnector {
+  tripId: string;
+  fromStopId: string;
+  toStopId: string;
+  path: [number, number, number][];
+  color: [number, number, number];
+}

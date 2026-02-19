@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import type { RouteData } from "../../types/route.type";
 import type { StopPositions } from "../../types/stop.type";
-import type { TripPath } from "../../types/trip.type";
+import type { TripPath, TurnaroundConnector } from "../../types/trip.type";
 import { generateOctilinearPaths } from "../../utils/path";
 import { convertToStopPositions, layoutRouteStops } from "../../utils/sugiyama";
+import { getTurnaroundConnectors } from "../../utils/turnaround";
 
 export const LAYOUT_OPTIONS = {
   stopSpacing: 100,
@@ -16,6 +17,7 @@ export const LAYOUT_OPTIONS = {
 export interface GraphLayoutResult {
   stationPositions: StopPositions;
   routePaths: TripPath[];
+  turnaroundConnectors: TurnaroundConnector[];
 }
 
 export function useGraphLayout(routeData: RouteData): GraphLayoutResult {
@@ -45,5 +47,10 @@ export function useGraphLayout(routeData: RouteData): GraphLayoutResult {
     [routeData.trips, stationPositions, layout, endStopIds],
   );
 
-  return { stationPositions, routePaths };
+  const turnaroundConnectors = useMemo(
+    () => getTurnaroundConnectors(routeData.trips, stationPositions),
+    [routeData.trips, stationPositions],
+  );
+
+  return { stationPositions, routePaths, turnaroundConnectors };
 }
