@@ -1,0 +1,50 @@
+{
+  "trips": [
+    {
+      "id": "L1-Loop",
+      "name": "L1-Loop",
+      "color": [59, 130, 246],
+      "outboundStop": ["E1", "A1", "B1", "C", "E2"],
+      "inboundStop": ["E2b", "D", "B2", "A2", "E1b"],
+      "outboundSegment": [
+        { "id": "E1-A1", "distance": 100, "nextStop": "A1", "prevStop": "E1", "cumulativeDistance": 0 },
+        { "id": "A1-B1", "distance": 100, "nextStop": "B1", "prevStop": "A1", "cumulativeDistance": 100 },
+        { "id": "B1-C", "distance": 100, "nextStop": "C", "prevStop": "B1", "cumulativeDistance": 200 },
+        { "id": "C-E2", "distance": 100, "nextStop": "E2", "prevStop": "C", "cumulativeDistance": 300 }
+      ],
+      "inboundSegment": [
+        { "id": "E2b-D", "distance": 100, "nextStop": "D", "prevStop": "E2b", "cumulativeDistance": 0 },
+        { "id": "D-B2", "distance": 100, "nextStop": "B2", "prevStop": "D", "cumulativeDistance": 100 },
+        { "id": "B2-A2", "distance": 100, "nextStop": "A2", "prevStop": "B2", "cumulativeDistance": 200 },
+        { "id": "A2-E1b", "distance": 100, "nextStop": "E1b", "prevStop": "A2", "cumulativeDistance": 300 }
+      ]
+    },
+    {
+      "id": "L2-OneWay",
+      "name": "L2-OneWay",
+      "color": [239, 68, 68],
+      "outboundStop": ["E1", "A1", "B1", "F", "E2"],
+      "inboundStop": [],
+      "outboundSegment": [
+        { "id": "E1-A1", "distance": 100, "nextStop": "A1", "prevStop": "E1", "cumulativeDistance": 0 },
+        { "id": "A1-B1", "distance": 100, "nextStop": "B1", "prevStop": "A1", "cumulativeDistance": 100 },
+        { "id": "B1-F", "distance": 100, "nextStop": "F", "prevStop": "B1", "cumulativeDistance": 200 },
+        { "id": "F-E2", "distance": 100, "nextStop": "E2", "prevStop": "F", "cumulativeDistance": 300 }
+      ],
+      "inboundSegment": []
+    }
+  ],
+  "stops": [
+    { "id": "E1", "name": "North Terminal", "endStop": "true" },
+    { "id": "E1b", "name": "North Terminal", "endStop": "true" },
+    { "id": "E2", "name": "South Terminal", "endStop": "true" },
+    { "id": "E2b", "name": "South Terminal", "endStop": "true" },
+    { "id": "A1", "name": "Station A" },
+    { "id": "A2", "name": "Station A" },
+    { "id": "B1", "name": "Junction B" },
+    { "id": "B2", "name": "Junction B" },
+    { "id": "C", "name": "Station C" },
+    { "id": "D", "name": "Station D" },
+    { "id": "F", "name": "Station F" }
+  ]
+}
