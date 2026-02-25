@@ -33,7 +33,7 @@ const generateSegmentPathPoints = (
 
   if (conn && conn.isExpress && tripLane) {
     const tripLaneY =
-      direction === "inbound"
+      direction === "outbound"
         ? baseY - conn.lane * laneHeight
         : baseY + conn.lane * laneHeight;
 

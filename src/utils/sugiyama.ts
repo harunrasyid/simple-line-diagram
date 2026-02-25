@@ -108,32 +108,38 @@ export function layoutRouteStops(
     ...inboundResult.stops.map((s) => s.layer),
     0,
   );
+  const outboundMaxLayer = Math.max(
+    ...outboundResult.stops.map((s) => s.layer),
+    0,
+  );
 
   const endStopEntries: StopLayout[] = [];
   for (const stop of routeData.stops) {
     if (!endStopIds.has(stop.id)) continue;
+    const outboundStop = outboundResult.stops.find(
+      (s) => s.stopId === stop.id,
+    );
     const inboundStop = inboundResult.stops.find((s) => s.stopId === stop.id);
-    const layer =
-      inboundStop !== undefined
-        ? inboundStop.layer
-        : (() => {
-            const outboundStop = outboundResult.stops.find(
-              (s) => s.stopId === stop.id,
-            );
-            if (outboundStop === undefined) return 0;
-            const outboundMaxLayer = Math.max(
-              ...outboundResult.stops.map((s) => s.layer),
-              0,
-            );
-            return outboundMaxLayer - outboundStop.layer;
-          })();
-    const isLeftTerminus = layer === 0;
+
+    // Left/right from top row (outbound): layer 0 = left, max = right
+    const placementLayer =
+      outboundStop !== undefined
+        ? outboundStop.layer
+        : inboundStop !== undefined
+          ? inboundMaxLayer - inboundStop.layer
+          : 0;
+
+    const isLeftTerminus = placementLayer === 0;
     const x = isLeftTerminus ? 0 : globalMaxX;
+    const layer = isLeftTerminus
+      ? 0
+      : Math.max(inboundMaxLayer, outboundMaxLayer);
+
     endStopEntries.push({
       stopId: stop.id,
       x,
       y: endStopY,
-      layer: isLeftTerminus ? 0 : inboundMaxLayer,
+      layer,
       lane: 0,
       name: stopNameMap.get(stop.id) ?? stop.id,
       direction: "endStop",
@@ -562,14 +568,14 @@ function positionStops(
   layers.forEach((layer, stopId) => {
     const lane = lanes.get(stopId) || 0;
 
-    // For outbound, reverse the X direction
+    // For inbound, reverse the X direction (outbound flows right, inbound flows left)
     const x =
-      direction === "inbound"
+      direction === "outbound"
         ? layer * stopSpacing
         : (getMaxLayer(layers) - layer) * stopSpacing;
 
     const y =
-      direction === "inbound"
+      direction === "outbound"
         ? baseY - lane * laneHeight
         : baseY + lane * laneHeight;
 

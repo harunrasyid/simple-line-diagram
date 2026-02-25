@@ -12,8 +12,8 @@ import { getTurnaroundConnectors } from "../../../utils/turnaround";
 export const LAYOUT_OPTIONS = {
   stopSpacing: 100,
   laneHeight: 60,
-  inboundY: -200,
-  outboundY: 0,
+  inboundY: 0,
+  outboundY: -200,
   endStopY: -100,
 } as const;
 
