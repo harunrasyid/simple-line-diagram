@@ -1,48 +1,23 @@
 import { useMemo, useState } from "react";
-import type { RouteData } from "./types/route.type";
-import type { Trip } from "./types/trip.type";
 import type { RendererType } from "./types/renderer.type";
 import { LineDiagramWrapper } from "./components/LineDiagram/LineDiagramWrapper";
 import { RendererSwitch } from "./components/RendererSwitch/RendererSwitch";
 import { TripFilter } from "./components/TripFilter/TripFilter";
 import { useVehicleSimulation } from "./hooks/useVehicleSimulation";
+import { useInput } from "./hooks/useInput";
 
 function App() {
-  // Default empty route data
-  const [routeData, setRouteData] = useState<RouteData>({
-    trips: [],
-    stops: [],
-  });
+  // Handle route input
+  const { routeData, visibleTrip, toggleRoute, handleJsonInput } = useInput();
 
-  const [visibleTrip, setVisibleTrip] = useState<Trip[]>([]);
   const [rendererType, setRendererType] = useState<RendererType>("deckgl");
-  const vehicles = useVehicleSimulation(routeData, { speed: 15, tickMs: 150 });
+  // Omit options to use hook defaults (DEFAULT_SPEED, DEFAULT_TICK_MS), or pass e.g. { speed: 500, tickMs: 50 } for faster movement
+  const vehicles = useVehicleSimulation(routeData);
+
   const visibleVehicles = useMemo(
     () => vehicles.filter((v) => visibleTrip.some((t) => t.id === v.tripId)),
     [vehicles, visibleTrip],
   );
-
-  const toggleRoute = (routeId: string): void => {
-    setVisibleTrip((prev) => {
-      if (prev.some((trip) => trip.id === routeId)) {
-        return prev.filter((trip) => trip.id !== routeId);
-      }
-      const newTrip = routeData.trips.find((trip) => trip.id === routeId);
-      return newTrip ? [...prev, newTrip] : prev;
-    });
-  };
-
-  const handleJsonInput = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
-    try {
-      const parsed = JSON.parse(e.target.value);
-      if (parsed.trips && parsed.stops) {
-        setRouteData(parsed);
-        setVisibleTrip(parsed.trips); // reset visible trips
-      }
-    } catch (err) {
-      console.error("Invalid JSON:", err);
-    }
-  };
 
   return (
     <div

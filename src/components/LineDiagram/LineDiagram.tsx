@@ -11,12 +11,12 @@ import type { LineDiagramProps } from "./LineDiagram.props";
 import type { Stop } from "../../types/stop.type";
 import type { SegmentPath } from "../../types/trip.type";
 import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
-import { useGraphLayout } from "./useGraphLayout";
 import { generateDiagonalHatchLines } from "../../utils/turnaround";
 import {
   resolveVehiclePosition,
   getVehicleTriangleVertices,
 } from "../../utils/vehicle";
+import { useGraphLayout } from "./hooks/useGraphLayout";
 
 const INITIAL_VIEW_STATE: OrthographicViewState = {
   target: [400, 0, 0],
@@ -24,6 +24,7 @@ const INITIAL_VIEW_STATE: OrthographicViewState = {
 };
 
 const VEHICLE_TRIANGLE_SIZE = 18;
+const LABEL_ROTATION_DEG = 25;
 
 export const LineDiagram = ({
   routeData,
@@ -133,19 +134,20 @@ export const LineDiagram = ({
       getLineColor: [30, 41, 59],
     }),
 
-    // Station labels
+    // Station labels (below stop, 25° rotation, anchor at text start)
     new TextLayer({
       id: "station-labels",
       data: routeData.stops.filter((s) => stationPositions[s.id]),
       getPosition: (d: Stop) => {
         const pos = stationPositions[d.id];
-        return [pos.x, pos.y - 25, 0];
+        return [pos.x, pos.y + 15, 0];
       },
       getText: (d: Stop) => `${d.name}`,
       getSize: 12,
       getColor: [255, 255, 255],
-      getAlignmentBaseline: "bottom",
-      getTextAnchor: "middle",
+      getAngle: -LABEL_ROTATION_DEG,
+      getAlignmentBaseline: "top",
+      getTextAnchor: "start",
       background: true,
       getBackgroundColor: [15, 23, 42, 200],
       backgroundPadding: [6, 3],
@@ -177,8 +179,9 @@ export const LineDiagram = ({
             getText: (d) => d.vehicleId,
             getSize: 10,
             getColor: [255, 255, 255],
-            getAlignmentBaseline: "bottom",
-            getTextAnchor: "middle",
+            getAngle: -LABEL_ROTATION_DEG,
+            getAlignmentBaseline: "top",
+            getTextAnchor: "end",
             background: true,
             getBackgroundColor: [15, 23, 42, 220],
             backgroundPadding: [4, 2],

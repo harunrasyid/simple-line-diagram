@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Stop } from "../../types/stop.type";
 import type { StopPositions } from "../../types/stop.type";
 import type { TripPath, TurnaroundConnector } from "../../types/trip.type";
-import { useGraphLayout } from "./useGraphLayout";
 import { generateDiagonalHatchLines } from "../../utils/turnaround";
 import {
   resolveVehiclePosition,
@@ -11,11 +10,14 @@ import {
 } from "../../utils/vehicle";
 import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
 import type { LineDiagramPixiProps } from "./LineDiagram.props";
+import { useGraphLayout } from "./hooks/useGraphLayout";
 
 const LINE_WIDTH = 8;
 const STATION_RADIUS = 8;
-const LABEL_OFFSET_Y = -25;
+const LABEL_OFFSET_Y = 15;
 const LABEL_FONT_SIZE = 12;
+const LABEL_ROTATION_DEG = 25;
+const LABEL_ROTATION_RAD = (LABEL_ROTATION_DEG * Math.PI) / 180;
 const VEHICLE_TRIANGLE_SIZE = 18;
 const VEHICLE_LABEL_FONT_SIZE = 10;
 const INITIAL_ZOOM = 1.2;
@@ -54,11 +56,7 @@ function drawGraph(
       alpha: 0.4,
     });
     for (const [x1, y1, x2, y2] of lines) {
-      turnaroundGraphics
-        .beginPath()
-        .moveTo(x1, y1)
-        .lineTo(x2, y2)
-        .stroke();
+      turnaroundGraphics.beginPath().moveTo(x1, y1).lineTo(x2, y2).stroke();
     }
   }
   container.addChild(turnaroundGraphics);
@@ -110,32 +108,36 @@ function drawGraph(
   }
   container.addChild(stationsGraphics);
 
-  // Labels layer
+  // Labels layer (below stop, 25° rotation, anchor at text start)
   for (const stop of stopsWithPositions) {
     const pos = stationPositions[stop.id];
+    const labelGroup = new Container();
+    labelGroup.position.set(pos.x, pos.y + LABEL_OFFSET_Y);
+    labelGroup.rotation = LABEL_ROTATION_RAD;
+
     const label = new Text({
       text: stop.name,
       style: {
         fontSize: LABEL_FONT_SIZE,
         fill: 0xffffff,
+        fontFamily: "sans-serif",
       },
     });
-    label.anchor.set(0.5, 1);
-    label.position.set(pos.x, pos.y + LABEL_OFFSET_Y);
-    // Background: dark rounded rect behind text
-    const bg = new Graphics();
+    label.anchor.set(0, 0);
+    label.position.set(0, 0);
+
     const padding = 6;
+    const vPad = 3;
     const w = label.width + padding * 2;
-    const h = label.height + 3 * 2;
-    bg.roundRect(
-      pos.x - w / 2,
-      pos.y + LABEL_OFFSET_Y - label.height - 3,
-      w,
-      h,
-      4,
-    ).fill({ color: 0x0f172a, alpha: 200 / 255 });
-    container.addChild(bg);
-    container.addChild(label);
+    const h = label.height + vPad * 2;
+    const bg = new Graphics();
+    bg.roundRect(-padding, -vPad, w, h, 4).fill({
+      color: 0x0f172a,
+      alpha: 200 / 255,
+    });
+    labelGroup.addChild(bg);
+    labelGroup.addChild(label);
+    container.addChild(labelGroup);
   }
 }
 
@@ -319,6 +321,10 @@ export function LineDiagramPixi({
         .stroke({ width: 1, color: 0x1e293b });
       vehiclesContainer.addChild(tri);
 
+      const labelGroup = new Container();
+      labelGroup.position.set(d.x, d.y - VEHICLE_TRIANGLE_SIZE - 4);
+      labelGroup.rotation = -LABEL_ROTATION_RAD;
+
       const label = new Text({
         text: d.vehicleId,
         style: {
@@ -326,22 +332,21 @@ export function LineDiagramPixi({
           fill: 0xffffff,
         },
       });
-      label.anchor.set(0.5, 1);
-      label.position.set(d.x, d.y - VEHICLE_TRIANGLE_SIZE - 4);
-      const bg = new Graphics();
+      label.anchor.set(0, 0);
+      label.position.set(0, 0);
+
       const padding = 4;
       const hPad = 2;
       const w = label.width + padding * 2;
       const h = label.height + hPad * 2;
-      bg.roundRect(
-        d.x - w / 2,
-        d.y - VEHICLE_TRIANGLE_SIZE - 4 - label.height - hPad,
-        w,
-        h,
-        4,
-      ).fill({ color: 0x0f172a, alpha: 220 / 255 });
-      vehiclesContainer.addChild(bg);
-      vehiclesContainer.addChild(label);
+      const bg = new Graphics();
+      bg.roundRect(-padding, -hPad, w, h, 4).fill({
+        color: 0x0f172a,
+        alpha: 220 / 255,
+      });
+      labelGroup.addChild(bg);
+      labelGroup.addChild(label);
+      vehiclesContainer.addChild(labelGroup);
     }
   }, [resolvedVehicles]);
 
