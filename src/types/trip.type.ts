@@ -24,6 +24,8 @@ export interface SegmentPath {
   prevStop: string;
   nextStop: string;
   direction: "inbound" | "outbound";
+  /** When true, render as dashed (branch/express, non–lane-0). */
+  isDashed?: boolean;
 }
 
 export interface TripPath extends Trip {

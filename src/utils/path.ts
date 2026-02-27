@@ -167,6 +167,7 @@ export const generateOctilinearPaths = (
           prevStop: seg.prevStop,
           nextStop: seg.nextStop,
           direction,
+          isDashed: (conn?.lane ?? 0) !== 0,
         };
       });
   };

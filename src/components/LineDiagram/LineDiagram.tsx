@@ -6,6 +6,7 @@ import DeckGL, {
   TextLayer,
   type OrthographicViewState,
 } from "deck.gl";
+import { PathStyleExtension } from "@deck.gl/extensions";
 import { useMemo } from "react";
 import type { LineDiagramProps } from "./LineDiagram.props";
 import type { Stop } from "../../types/stop.type";
@@ -17,6 +18,11 @@ import {
   getVehicleTriangleVertices,
 } from "../../utils/vehicle";
 import { useGraphLayout } from "./hooks/useGraphLayout";
+import {
+  ROUTE_LINE_WIDTH,
+  DASH_LENGTH,
+  GAP_LENGTH,
+} from "./pathStyleConstants";
 
 const INITIAL_VIEW_STATE: OrthographicViewState = {
   target: [400, 0, 0],
@@ -106,10 +112,15 @@ export const LineDiagram = ({
       data: allSegments,
       getPath: (d: SegmentPath) => d.path,
       getColor: (d: SegmentPath) => [...d.color],
-      getWidth: 8,
+      getWidth: ROUTE_LINE_WIDTH,
       widthMinPixels: 4,
       jointRounded: true,
       capRounded: true,
+      extensions: [new PathStyleExtension({ dash: true })],
+      getDashArray: (d: SegmentPath) =>
+        d.isDashed
+          ? [DASH_LENGTH / ROUTE_LINE_WIDTH, GAP_LENGTH / ROUTE_LINE_WIDTH]
+          : [0, 0],
     }),
 
     // Stations

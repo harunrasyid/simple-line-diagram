@@ -11,8 +11,12 @@ import {
 import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
 import type { LineDiagramPixiProps } from "./LineDiagram.props";
 import { useGraphLayout } from "./hooks/useGraphLayout";
+import {
+  ROUTE_LINE_WIDTH,
+  DASH_LENGTH,
+  GAP_LENGTH,
+} from "./pathStyleConstants";
 
-const LINE_WIDTH = 8;
 const STATION_RADIUS = 8;
 const LABEL_OFFSET_Y = 15;
 const LABEL_FONT_SIZE = 12;
@@ -25,6 +29,61 @@ const INITIAL_TARGET: [number, number] = [400, 0];
 
 function rgbToHex([r, g, b]: [number, number, number]): number {
   return (r << 16) | (g << 8) | b;
+}
+
+/**
+ * Draw a polyline as dashed segments (dashLength then gapLength) along the path.
+ */
+function drawDashedPath(
+  graphics: Graphics,
+  pathPoints: [number, number, number][],
+  color: number,
+  lineWidth: number,
+  dashLength: number,
+  gapLength: number,
+): void {
+  if (pathPoints.length < 2) return;
+  const n = pathPoints.length;
+  const cumulative: number[] = [0];
+  for (let i = 1; i < n; i++) {
+    const a = pathPoints[i - 1];
+    const b = pathPoints[i];
+    const segLen = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    cumulative[i] = cumulative[i - 1] + segLen;
+  }
+  const totalLen = cumulative[n - 1];
+
+  function pointAt(t: number): [number, number] {
+    if (t <= 0) return [pathPoints[0][0], pathPoints[0][1]];
+    if (t >= totalLen) return [pathPoints[n - 1][0], pathPoints[n - 1][1]];
+    let i = 0;
+    while (i < n - 1 && cumulative[i + 1] < t) i++;
+    const t0 = cumulative[i];
+    const t1 = cumulative[i + 1];
+    const frac = (t - t0) / (t1 - t0 || 1);
+    const x =
+      pathPoints[i][0] + frac * (pathPoints[i + 1][0] - pathPoints[i][0]);
+    const y =
+      pathPoints[i][1] + frac * (pathPoints[i + 1][1] - pathPoints[i][1]);
+    return [x, y];
+  }
+
+  graphics.setStrokeStyle({
+    width: lineWidth,
+    color,
+    cap: "round",
+    join: "round",
+  });
+  graphics.beginPath();
+  let t = 0;
+  while (t < totalLen) {
+    const dashEnd = Math.min(t + dashLength, totalLen);
+    const p0 = pointAt(t);
+    const p1 = pointAt(dashEnd);
+    graphics.moveTo(p0[0], p0[1]).lineTo(p1[0], p1[1]);
+    t = dashEnd + gapLength;
+  }
+  graphics.stroke();
 }
 
 function drawGraph(
@@ -68,19 +127,30 @@ function drawGraph(
     for (const segment of allSegments) {
       if (segment.path.length < 2) continue;
       const color = rgbToHex(segment.color);
-      pathsGraphics
-        .beginPath()
-        .setStrokeStyle({
-          width: LINE_WIDTH,
+      if (segment.isDashed) {
+        drawDashedPath(
+          pathsGraphics,
+          segment.path,
           color,
-          cap: "round",
-          join: "round",
-        })
-        .moveTo(segment.path[0][0], segment.path[0][1]);
-      for (let i = 1; i < segment.path.length; i++) {
-        pathsGraphics.lineTo(segment.path[i][0], segment.path[i][1]);
+          ROUTE_LINE_WIDTH,
+          DASH_LENGTH,
+          GAP_LENGTH,
+        );
+      } else {
+        pathsGraphics
+          .beginPath()
+          .setStrokeStyle({
+            width: ROUTE_LINE_WIDTH,
+            color,
+            cap: "round",
+            join: "round",
+          })
+          .moveTo(segment.path[0][0], segment.path[0][1]);
+        for (let i = 1; i < segment.path.length; i++) {
+          pathsGraphics.lineTo(segment.path[i][0], segment.path[i][1]);
+        }
+        pathsGraphics.stroke();
       }
-      pathsGraphics.stroke();
     }
   }
   container.addChild(pathsGraphics);
