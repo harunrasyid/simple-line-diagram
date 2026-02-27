@@ -184,18 +184,9 @@ function layoutDirection(
 
   // Step 2: Layer assignment (topological sort to determine horizontal position)
   const layers = assignLayers(graph);
-  console.log(`[${direction}] Layer assignments:`, Object.fromEntries(layers));
 
   // Step 3: Lane assignment (determine vertical position for branches)
   const { stopLanes, tripLanes } = assignLanes(trips, direction, layers);
-  console.log(
-    `[${direction}] Final stop lane assignments:`,
-    Object.fromEntries(stopLanes),
-  );
-  console.log(
-    `[${direction}] Final trip lane assignments:`,
-    Object.fromEntries(tripLanes),
-  );
 
   // Step 4: Position assignment
   const stops = positionStops(
@@ -380,12 +371,20 @@ function assignLanes(
     tripExpressConnections.set(trip.id, expressConns);
   });
 
-  trips.forEach((trip) => {
+  // Process local (non-express, longer) trips first so they get lane 0; express trips get higher lanes
+  // so shared stops sit on the main line and express bypass is visible.
+  const sortedTrips = [...trips].sort((a, b) => {
+    const aStops = tripStopsMap.get(a.id) || [];
+    const bStops = tripStopsMap.get(b.id) || [];
+    const aHasExpress = (tripExpressConnections.get(a.id) || []).length > 0;
+    const bHasExpress = (tripExpressConnections.get(b.id) || []).length > 0;
+    if (aHasExpress !== bHasExpress) return aHasExpress ? 1 : -1;
+    return bStops.length - aStops.length;
+  });
+
+  sortedTrips.forEach((trip) => {
     const stops = tripStopsMap.get(trip.id) || [];
     const expressConns = tripExpressConnections.get(trip.id) || [];
-
-    console.log(`\n[Lane Assignment] Processing trip ${trip.id}:`, stops);
-    console.log(`  Express connections:`, expressConns);
 
     // Try to find an existing lane that doesn't conflict
     let assignedLane = -1;
@@ -393,7 +392,6 @@ function assignLanes(
     for (let lane = 0; lane <= nextLane; lane++) {
       let hasConflict = false;
       const isNewLane = lane === nextLane;
-      console.log(`  Trying lane ${lane}${isNewLane ? " (new)" : ""}...`);
 
       // Check 1: Would any of our stops conflict with existing stops in the same layer?
       for (const stopId of stops) {
@@ -408,14 +406,11 @@ function assignLanes(
                 existingAssignment.lane === lane &&
                 !stops.includes(otherStop)
               ) {
-                console.log(
-                  `    Conflict: Stop ${otherStop} already in layer ${layer} at lane ${lane}`,
-                );
                 hasConflict = true;
                 break;
               }
             }
-          } 
+          }
         }
         if (hasConflict) break;
       }
@@ -438,9 +433,6 @@ function assignLanes(
                 existingAssignment.lane === lane &&
                 !stops.includes(stopInLayer)
               ) {
-                console.log(
-                  `    Conflict: Our express ${conn.from}->${conn.to} would cross stop ${stopInLayer} at layer ${checkLayer}`,
-                );
                 hasConflict = true;
                 break;
               }
@@ -463,9 +455,6 @@ function assignLanes(
                 // Our stop would be crossed by another trip's express connection
                 const blockingTripStops = tripStopsMap.get(range.tripId) || [];
                 if (!blockingTripStops.includes(stopId)) {
-                  console.log(
-                    `    Conflict: Our stop ${stopId} at layer ${stopLayer} would be crossed by trip ${range.tripId}'s express connection (layers ${range.minLayer}-${range.maxLayer})`,
-                  );
                   hasConflict = true;
                   break;
                 }
@@ -490,9 +479,6 @@ function assignLanes(
               stopLayer < range.maxLayer &&
               !blockingTripStops.includes(stopId)
             ) {
-              console.log(
-                `    Conflict: Existing trip ${range.tripId} express (layers ${range.minLayer}-${range.maxLayer}) would cross our stop ${stopId} at layer ${stopLayer}`,
-              );
               hasConflict = true;
               break;
             }
@@ -514,7 +500,6 @@ function assignLanes(
     }
 
     tripLanes.set(trip.id, assignedLane);
-    console.log(`  Assigned lane ${assignedLane} to trip ${trip.id}`);
 
     // Register blocked ranges for this trip's express connections
     if (!blockedRanges.has(assignedLane)) {
@@ -526,9 +511,6 @@ function assignLanes(
         maxLayer: conn.maxLayer,
         tripId: trip.id,
       });
-      console.log(
-        `  Blocked layers ${conn.minLayer + 1} to ${conn.maxLayer - 1} on lane ${assignedLane} for express ${conn.from}->${conn.to}`,
-      );
     }
 
     // Assign lane to all stops in this trip
@@ -628,16 +610,9 @@ function buildConnections(
     layerStops.get(layer)!.push(stopId);
   });
 
-  console.log(
-    `[buildConnections] ${direction} tripLanes:`,
-    Object.fromEntries(tripLanes),
-  );
-
   trips.forEach((trip) => {
     const stops = direction === "inbound" ? trip.inboundStop : trip.outboundStop;
     const tripLane = tripLanes.get(trip.id) || 0;
-
-    console.log(`[buildConnections] Trip ${trip.id}: lane=${tripLane}`);
 
     for (let i = 0; i < stops.length - 1; i++) {
       const from = stops[i];
@@ -667,12 +642,6 @@ function buildConnections(
           }
           if (isExpress) break;
         }
-      }
-
-      if (isExpress) {
-        console.log(
-          `[buildConnections] Express connection ${from}->${to}: layers ${fromLayer}->${toLayer}, lane=${tripLane}`,
-        );
       }
 
       connections.push({
@@ -740,8 +709,5 @@ export function convertToStopPositions(layout: LayoutResult): StopPositions {
     };
   });
 
-  console.log("position", positions);
-
   return positions;
-  
 }

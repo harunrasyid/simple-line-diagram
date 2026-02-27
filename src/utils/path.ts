@@ -31,27 +31,26 @@ const generateSegmentPathPoints = (
   const dx = nextPos.x - prevPos.x;
   const dy = nextPos.y - prevPos.y;
 
+  // Express segments are always drawn as a bypass at conn.lane so they remain visible when shared with local service.
+  // Use direction-aware offsets: for outbound next is right (dx >= 0), for inbound next is left (dx < 0).
   if (conn && conn.isExpress && tripLane) {
     const tripLaneY =
       direction === "outbound"
         ? baseY - conn.lane * laneHeight
         : baseY + conn.lane * laneHeight;
 
-    if (Math.abs(tripLaneY - prevPos.y) > 1) {
-      const horizontalOffset = 20;
-      const detourX1 = prevPos.x + horizontalOffset;
-      path.push([detourX1, prevPos.y, 0]);
-      path.push([detourX1, tripLaneY, 0]);
-      const detourX2 = nextPos.x - horizontalOffset;
-      if (detourX2 > detourX1) {
-        path.push([detourX2, tripLaneY, 0]);
-      }
-      path.push([detourX2 > detourX1 ? detourX2 : detourX1, nextPos.y, 0]);
-    } else if (dy !== 0) {
-      const midX = prevPos.x + dx / 2;
-      path.push([midX, prevPos.y, 0]);
-      path.push([midX, nextPos.y, 0]);
+    const horizontalOffset = 20;
+    const goingRight = dx >= 0;
+    const detourX1 = goingRight ? prevPos.x + horizontalOffset : prevPos.x - horizontalOffset;
+    const detourX2 = goingRight ? nextPos.x - horizontalOffset : nextPos.x + horizontalOffset;
+    const hasHorizontalRun = goingRight ? detourX2 > detourX1 : detourX2 < detourX1;
+
+    path.push([detourX1, prevPos.y, 0]);
+    path.push([detourX1, tripLaneY, 0]);
+    if (hasHorizontalRun) {
+      path.push([detourX2, tripLaneY, 0]);
     }
+    path.push([hasHorizontalRun ? detourX2 : detourX1, nextPos.y, 0]);
   } else {
     if (dy !== 0 && dx !== 0) {
       const prevIsEndStop = endStopIds.has(prevStopId);
