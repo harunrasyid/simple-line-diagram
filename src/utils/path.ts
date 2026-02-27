@@ -2,6 +2,11 @@ import type { StopPositions } from "../types/stop.type";
 import type { Trip, TripPath, SegmentPath } from "../types/trip.type";
 import type { Connection, LayoutResult } from "./sugiyama";
 
+/** Bias vertical merge turn toward destination (1 = at destination, 0.5 = midpoint). */
+const MERGE_BIAS = 0.5;
+/** Minimum horizontal span so the turn does not overlap the stop circle. */
+const MIN_HORIZONTAL_SEGMENT = 10;
+
 export interface PathGenerationOptions {
   laneHeight?: number;
   inboundY?: number;
@@ -9,9 +14,19 @@ export interface PathGenerationOptions {
   endStopIds?: Set<string>;
 }
 
+function clampBiasedX(biasedX: number, prevX: number, nextX: number): number {
+  const minX = Math.min(prevX, nextX);
+  const maxX = Math.max(prevX, nextX);
+  const left = minX + MIN_HORIZONTAL_SEGMENT;
+  const right = maxX - MIN_HORIZONTAL_SEGMENT;
+  if (left >= right) return (minX + maxX) / 2;
+  return Math.max(left, Math.min(right, biasedX));
+}
+
 /**
  * Generate a single segment path from prevStop center to nextStop center
  * using octilinear routing (express detours, 90-degree turns, end-stop routing).
+ * Merge turns are biased toward the destination X so branches do not appear to rejoin at intermediate stops.
  */
 const generateSegmentPathPoints = (
   prevPos: { x: number; y: number },
@@ -31,26 +46,23 @@ const generateSegmentPathPoints = (
   const dx = nextPos.x - prevPos.x;
   const dy = nextPos.y - prevPos.y;
 
-  // Express segments are always drawn as a bypass at conn.lane so they remain visible when shared with local service.
-  // Use direction-aware offsets: for outbound next is right (dx >= 0), for inbound next is left (dx < 0).
+  // Express segments: bypass on express lane and merge back exactly at destination X.
   if (conn && conn.isExpress && tripLane) {
     const tripLaneY =
       direction === "outbound"
         ? baseY - conn.lane * laneHeight
         : baseY + conn.lane * laneHeight;
 
-    const horizontalOffset = 20;
+    const horizontalOffset = Math.max(MIN_HORIZONTAL_SEGMENT, 20);
     const goingRight = dx >= 0;
-    const detourX1 = goingRight ? prevPos.x + horizontalOffset : prevPos.x - horizontalOffset;
-    const detourX2 = goingRight ? nextPos.x - horizontalOffset : nextPos.x + horizontalOffset;
-    const hasHorizontalRun = goingRight ? detourX2 > detourX1 : detourX2 < detourX1;
+    const detourX = goingRight
+      ? prevPos.x + horizontalOffset
+      : prevPos.x - horizontalOffset;
 
-    path.push([detourX1, prevPos.y, 0]);
-    path.push([detourX1, tripLaneY, 0]);
-    if (hasHorizontalRun) {
-      path.push([detourX2, tripLaneY, 0]);
-    }
-    path.push([hasHorizontalRun ? detourX2 : detourX1, nextPos.y, 0]);
+    path.push([detourX, prevPos.y, 0]);
+    path.push([detourX, tripLaneY, 0]);
+    path.push([nextPos.x, tripLaneY, 0]);
+    path.push([nextPos.x, nextPos.y, 0]);
   } else {
     if (dy !== 0 && dx !== 0) {
       const prevIsEndStop = endStopIds.has(prevStopId);
@@ -61,9 +73,10 @@ const generateSegmentPathPoints = (
         path.push([endStopX, prevPos.y, 0]);
         path.push([endStopX, nextPos.y, 0]);
       } else {
-        const midX = prevPos.x + dx / 2;
-        path.push([midX, prevPos.y, 0]);
-        path.push([midX, nextPos.y, 0]);
+        const biasedX = prevPos.x + dx * MERGE_BIAS;
+        const turnX = clampBiasedX(biasedX, prevPos.x, nextPos.x);
+        path.push([turnX, prevPos.y, 0]);
+        path.push([turnX, nextPos.y, 0]);
       }
     }
   }
