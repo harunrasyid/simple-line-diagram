@@ -116,6 +116,14 @@ export const useInput = () => {
     });
   };
 
+  const showAllTrips = (): void => {
+    setVisibleTrip(routeData.trips);
+  };
+
+  const hideAllTrips = (): void => {
+    setVisibleTrip([]);
+  };
+
   const handleJsonInput = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
     try {
       const parsed = JSON.parse(e.target.value || "{}");
@@ -133,6 +141,8 @@ export const useInput = () => {
     routeData,
     visibleTrip,
     toggleRoute,
+    showAllTrips,
+    hideAllTrips,
     handleJsonInput,
   };
 };

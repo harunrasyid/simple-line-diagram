@@ -182,7 +182,7 @@ function drawGraph(
     labelGroup.rotation = LABEL_ROTATION_RAD;
 
     const label = new Text({
-      text: stop.name,
+      text: `${stop.name} (${stop.id})`,
       style: {
         fontSize: LABEL_FONT_SIZE,
         fill: 0xffffff,

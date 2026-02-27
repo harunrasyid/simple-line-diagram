@@ -8,7 +8,14 @@ import { useInput } from "./hooks/useInput";
 
 function App() {
   // Handle route input
-  const { routeData, visibleTrip, toggleRoute, handleJsonInput } = useInput();
+  const {
+    routeData,
+    visibleTrip,
+    toggleRoute,
+    showAllTrips,
+    hideAllTrips,
+    handleJsonInput,
+  } = useInput();
 
   const [rendererType, setRendererType] = useState<RendererType>("deckgl");
   // Omit options to use hook defaults (DEFAULT_SPEED, DEFAULT_TICK_MS), or pass e.g. { speed: 500, tickMs: 50 } for faster movement
@@ -79,6 +86,8 @@ function App() {
         routeData={routeData}
         visibleTrips={visibleTrip}
         onTripChange={toggleRoute}
+        onCheckAll={showAllTrips}
+        onUncheckAll={hideAllTrips}
       />
     </div>
   );

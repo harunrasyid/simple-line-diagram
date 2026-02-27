@@ -5,4 +5,6 @@ export interface TripFilterProps {
   routeData: RouteData;
   visibleTrips: Trip[];
   onTripChange: (tripId: string) => void;
+  onCheckAll: () => void;
+  onUncheckAll: () => void;
 }

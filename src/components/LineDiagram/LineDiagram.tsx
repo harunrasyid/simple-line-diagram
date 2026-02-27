@@ -150,7 +150,7 @@ export const LineDiagram = ({
         const pos = stationPositions[d.id];
         return [pos.x, pos.y + 15, 0];
       },
-      getText: (d: Stop) => `${d.name}`,
+      getText: (d: Stop) => `${d.name} (${d.id})`,
       getSize: 12,
       getColor: [255, 255, 255],
       getAngle: -LABEL_ROTATION_DEG,
