@@ -209,7 +209,13 @@ function layoutDirection(
   );
 
   // Step 5: Build connections (with trip lanes for proper routing)
-  const connections = buildConnections(trips, direction, layers, tripLanes);
+  const connections = buildConnections(
+    trips,
+    direction,
+    layers,
+    tripLanes,
+    stopLanes,
+  );
 
   return { stops, connections };
 }
@@ -612,8 +618,15 @@ function buildConnections(
   direction: "inbound" | "outbound",
   layers: Map<string, number>,
   tripLanes: Map<string, number>,
+  stopLanes: Map<string, number>,
 ): Connection[] {
   const connections: Connection[] = [];
+
+  const layerStops = new Map<number, string[]>();
+  layers.forEach((layer, stopId) => {
+    if (!layerStops.has(layer)) layerStops.set(layer, []);
+    layerStops.get(layer)!.push(stopId);
+  });
 
   console.log(
     `[buildConnections] ${direction} tripLanes:`,
@@ -633,11 +646,28 @@ function buildConnections(
       const fromLayer = layers.get(from);
       const toLayer = layers.get(to);
 
-      // Check if connection skips layers (express)
-      const isExpress =
-        fromLayer !== undefined &&
-        toLayer !== undefined &&
-        Math.abs(toLayer - fromLayer) > 1;
+      const layerGap =
+        fromLayer !== undefined && toLayer !== undefined
+          ? Math.abs(toLayer - fromLayer)
+          : 0;
+
+      let isExpress = false;
+      if (layerGap > 1 && fromLayer !== undefined && toLayer !== undefined) {
+        const fromLane = stopLanes.get(from) ?? 0;
+        const minLayer = Math.min(fromLayer, toLayer);
+        const maxLayer = Math.max(fromLayer, toLayer);
+
+        for (let l = minLayer + 1; l < maxLayer; l++) {
+          const stopsAtLayer = layerStops.get(l) || [];
+          for (const sid of stopsAtLayer) {
+            if (!stops.includes(sid) && (stopLanes.get(sid) ?? 0) === fromLane) {
+              isExpress = true;
+              break;
+            }
+          }
+          if (isExpress) break;
+        }
+      }
 
       if (isExpress) {
         console.log(

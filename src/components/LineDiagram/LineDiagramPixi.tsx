@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Stop } from "../../types/stop.type";
 import type { StopPositions } from "../../types/stop.type";
 import type { TripPath, TurnaroundConnector } from "../../types/trip.type";
-import { generateDiagonalHatchLines } from "../../utils/turnaround";
+import { generatePathFollowingHatchLines } from "../../utils/turnaround";
 import {
   resolveVehiclePosition,
   getVehicleTriangleVertices,
@@ -43,15 +43,11 @@ function drawGraph(
     visibleTripIds.has(c.tripId),
   );
   for (const connector of visibleConnectors) {
-    const fromPos = stationPositions[connector.fromStopId];
-    const toPos = stationPositions[connector.toStopId];
-    if (!fromPos || !toPos) continue;
-
-    const lines = generateDiagonalHatchLines(fromPos, toPos);
+    const lines = generatePathFollowingHatchLines(connector.path);
     const color = rgbToHex(connector.color);
 
     turnaroundGraphics.setStrokeStyle({
-      width: 1.5,
+      width: 2.5,
       color,
       alpha: 0.4,
     });

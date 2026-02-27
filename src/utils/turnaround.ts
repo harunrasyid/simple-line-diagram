@@ -28,17 +28,15 @@ export function hasExistingConnection(
 
 /**
  * Generate path points for the turnaround connector.
- * - If stops are vertically aligned (same X): direct diagonal line.
- * - If not: split with a turn at the center X.
+ * - If stops are vertically aligned (same X): direct vertical line.
+ * - If not: S-shape with horizontal segment at midY (between inbound/outbound layers).
  */
 export function generateTurnaroundPath(
   fromPos: { x: number; y: number },
   toPos: { x: number; y: number },
 ): [number, number, number][] {
   const z = 0;
-  const path: [number, number, number][] = [
-    [fromPos.x, fromPos.y, z],
-  ];
+  const path: [number, number, number][] = [[fromPos.x, fromPos.y, z]];
 
   const aligned =
     Math.abs(fromPos.x - toPos.x) <= VERTICAL_ALIGN_THRESHOLD;
@@ -46,9 +44,9 @@ export function generateTurnaroundPath(
   if (aligned) {
     path.push([toPos.x, toPos.y, z]);
   } else {
-    const centerX = (fromPos.x + toPos.x) / 2;
-    path.push([centerX, fromPos.y, z]);
-    path.push([centerX, toPos.y, z]);
+    const midY = (fromPos.y + toPos.y) / 2;
+    path.push([fromPos.x, midY, z]);
+    path.push([toPos.x, midY, z]);
     path.push([toPos.x, toPos.y, z]);
   }
 
@@ -56,7 +54,7 @@ export function generateTurnaroundPath(
 }
 
 const DEFAULT_HATCH_SPACING = 12;
-const HATCH_VERTICAL_WIDTH = 20;
+const HATCH_VERTICAL_WIDTH = 32;
 
 /**
  * Generate parallel diagonal (45-degree) line segments for hatching the area
@@ -92,6 +90,60 @@ export function generateDiagonalHatchLines(
   }
 
   return lines;
+}
+
+/**
+ * Generate diagonal hatch lines that follow a polyline path by creating
+ * a narrow corridor around each segment and hatching that rectangle.
+ */
+export function generatePathFollowingHatchLines(
+  path: [number, number, number][],
+  corridorWidth: number = HATCH_VERTICAL_WIDTH,
+  spacing: number = DEFAULT_HATCH_SPACING,
+): [number, number, number, number][] {
+  if (path.length < 2) return [];
+
+  const allLines: [number, number, number, number][] = [];
+  const halfWidth = corridorWidth / 2;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const [x0, y0] = path[i];
+    const [x1, y1] = path[i + 1];
+
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+
+    // Skip zero-length segments
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+
+    let minX: number;
+    let maxX: number;
+    let minY: number;
+    let maxY: number;
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      // Treat as horizontal-dominant segment
+      minX = Math.min(x0, x1);
+      maxX = Math.max(x0, x1);
+      minY = Math.min(y0 - halfWidth, y0 + halfWidth);
+      maxY = Math.max(y0 - halfWidth, y0 + halfWidth);
+    } else {
+      // Treat as vertical-dominant segment
+      minX = Math.min(x0 - halfWidth, x0 + halfWidth);
+      maxX = Math.max(x0 - halfWidth, x0 + halfWidth);
+      minY = Math.min(y0, y1);
+      maxY = Math.max(y0, y1);
+    }
+
+    const segmentLines = generateDiagonalHatchLines(
+      { x: minX, y: minY },
+      { x: maxX, y: maxY },
+      spacing,
+    );
+    allLines.push(...segmentLines);
+  }
+
+  return allLines;
 }
 
 /**

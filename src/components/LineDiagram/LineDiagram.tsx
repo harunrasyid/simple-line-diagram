@@ -11,7 +11,7 @@ import type { LineDiagramProps } from "./LineDiagram.props";
 import type { Stop } from "../../types/stop.type";
 import type { SegmentPath } from "../../types/trip.type";
 import type { ResolvedVehiclePosition } from "../../types/vehicle.type";
-import { generateDiagonalHatchLines } from "../../utils/turnaround";
+import { generatePathFollowingHatchLines } from "../../utils/turnaround";
 import {
   resolveVehiclePosition,
   getVehicleTriangleVertices,
@@ -48,10 +48,7 @@ export const LineDiagram = ({
   const turnaroundHatchSegments = useMemo(
     () =>
       visibleTurnaroundConnectors.flatMap((c) => {
-        const fromPos = stationPositions[c.fromStopId];
-        const toPos = stationPositions[c.toStopId];
-        if (!fromPos || !toPos) return [];
-        return generateDiagonalHatchLines(fromPos, toPos).map((line) => ({
+        return generatePathFollowingHatchLines(c.path).map((line) => ({
           path: [
             [line[0], line[1], 0],
             [line[2], line[3], 0],
@@ -59,7 +56,7 @@ export const LineDiagram = ({
           color: c.color,
         }));
       }),
-    [visibleTurnaroundConnectors, stationPositions],
+    [visibleTurnaroundConnectors],
   );
 
   const allSegments = routePaths
@@ -97,8 +94,8 @@ export const LineDiagram = ({
               ...d.color,
               100,
             ],
-            getWidth: 1.5,
-            widthMinPixels: 1,
+            getWidth: 2.5,
+            widthMinPixels: 2,
           }),
         ]
       : []),
