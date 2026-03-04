@@ -327,6 +327,7 @@ function assignLanes(
     number,
     Array<{ minLayer: number; maxLayer: number; tripId: string }>
   >();
+  
 
   // Track which stops are assigned to which lane by which trip
   // This helps with the "stop already placed" conflict check
