@@ -70,6 +70,10 @@ export function layoutRouteStops(
 
   const stopNameMap = new Map(routeData.stops.map((s) => [s.id, s.name]));
 
+  const endStopIds = new Set(
+    routeData.stops.filter((s) => s.endStop).map((s) => s.id),
+  );
+
   // Process inbound and outbound separately
   const inboundResult = layoutDirection(
     routeData.trips,
@@ -78,6 +82,7 @@ export function layoutRouteStops(
     stopSpacing,
     laneHeight,
     inboundY,
+    endStopIds,
   );
 
   const outboundResult = layoutDirection(
@@ -87,22 +92,10 @@ export function layoutRouteStops(
     stopSpacing,
     laneHeight,
     outboundY,
+    endStopIds,
   );
 
   // EndStop post-processing: place terminal stops on middle layer at left/right
-  const endStopIds = new Set(
-    routeData.stops.filter((s) => s.endStop).map((s) => s.id),
-  );
-
-  const inboundMaxX = Math.max(
-    ...inboundResult.stops.map((s) => s.x),
-    0,
-  );
-  const outboundMaxX = Math.max(
-    ...outboundResult.stops.map((s) => s.x),
-    0,
-  );
-  const globalMaxX = Math.max(inboundMaxX, outboundMaxX);
 
   const inboundMaxLayer = Math.max(
     ...inboundResult.stops.map((s) => s.layer),
@@ -130,10 +123,9 @@ export function layoutRouteStops(
           : 0;
 
     const isLeftTerminus = placementLayer === 0;
-    const x = isLeftTerminus ? 0 : globalMaxX;
-    const layer = isLeftTerminus
-      ? 0
-      : Math.max(inboundMaxLayer, outboundMaxLayer);
+    const maxLayer = Math.max(inboundMaxLayer, outboundMaxLayer);
+    const x = isLeftTerminus ? -stopSpacing : (maxLayer + 1) * stopSpacing;
+    const layer = isLeftTerminus ? -1 : maxLayer + 1;
 
     endStopEntries.push({
       stopId: stop.id,
@@ -178,6 +170,7 @@ function layoutDirection(
   stopSpacing: number,
   laneHeight: number,
   baseY: number,
+  endStopIds: Set<string>,
 ): { stops: StopLayout[]; connections: Connection[] } {
   // Step 1: Build graph from all trips
   const graph = buildGraph(trips, direction);
@@ -186,7 +179,12 @@ function layoutDirection(
   const layers = assignLayers(graph);
 
   // Step 3: Lane assignment (determine vertical position for branches)
-  const { stopLanes, tripLanes } = assignLanes(trips, direction, layers);
+  const { stopLanes, tripLanes } = assignLanes(
+    trips,
+    direction,
+    layers,
+    endStopIds,
+  );
 
   // Step 4: Position assignment
   const stops = positionStops(
@@ -206,6 +204,7 @@ function layoutDirection(
     layers,
     tripLanes,
     stopLanes,
+    endStopIds,
   );
 
   return { stops, connections };
@@ -301,6 +300,7 @@ function assignLanes(
   trips: Trip[],
   direction: "inbound" | "outbound",
   layers: Map<string, number>,
+  endStopIds: Set<string>,
 ): { stopLanes: Map<string, number>; tripLanes: Map<string, number> } {
   const lanes = new Map<string, number>();
 
@@ -360,8 +360,17 @@ function assignLanes(
       const toLayer = layers.get(toStop);
 
       if (fromLayer !== undefined && toLayer !== undefined) {
-        const minLayer = Math.min(fromLayer, toLayer);
-        const maxLayer = Math.max(fromLayer, toLayer);
+        let minLayer = Math.min(fromLayer, toLayer);
+        let maxLayer = Math.max(fromLayer, toLayer);
+
+        const graphMaxLayer = getMaxLayer(layers);
+        if (endStopIds.has(toStop) && toLayer > 0) {
+          maxLayer = graphMaxLayer;
+        }
+        if (endStopIds.has(fromStop) && fromLayer > 0) {
+          maxLayer = graphMaxLayer;
+        }
+
         if (maxLayer - minLayer > 1) {
           // This is an express connection
           expressConns.push({ from: fromStop, to: toStop, minLayer, maxLayer });
@@ -600,7 +609,8 @@ function buildConnections(
   direction: "inbound" | "outbound",
   layers: Map<string, number>,
   tripLanes: Map<string, number>,
-  stopLanes: Map<string, number>,
+  _stopLanes: Map<string, number>,
+  endStopIds: Set<string>,
 ): Connection[] {
   const connections: Connection[] = [];
 
@@ -621,21 +631,42 @@ function buildConnections(
       const fromLayer = layers.get(from);
       const toLayer = layers.get(to);
 
+      let effectiveFromLayer = fromLayer;
+      let effectiveToLayer = toLayer;
+      const graphMaxLayer = getMaxLayer(layers);
+      if (endStopIds.has(from) && fromLayer !== undefined && fromLayer > 0) {
+        effectiveFromLayer = graphMaxLayer;
+      }
+      if (endStopIds.has(to) && toLayer !== undefined && toLayer > 0) {
+        effectiveToLayer = graphMaxLayer;
+      }
+
       const layerGap =
-        fromLayer !== undefined && toLayer !== undefined
-          ? Math.abs(toLayer - fromLayer)
+        effectiveFromLayer !== undefined && effectiveToLayer !== undefined
+          ? Math.abs(effectiveToLayer - effectiveFromLayer)
           : 0;
 
       let isExpress = false;
       if (layerGap > 1 && fromLayer !== undefined && toLayer !== undefined) {
-        const fromLane = stopLanes.get(from) ?? 0;
-        const minLayer = Math.min(fromLayer, toLayer);
-        const maxLayer = Math.max(fromLayer, toLayer);
+        // Any intermediate stop we don't serve means we cross that band → express
+        const minLayer = Math.min(
+          effectiveFromLayer ?? fromLayer,
+          effectiveToLayer ?? toLayer,
+        );
+        const maxLayer = Math.max(
+          effectiveFromLayer ?? fromLayer,
+          effectiveToLayer ?? toLayer,
+        );
+        // When range was extended for end stop, check up to graphMaxLayer inclusive
+        const maxCheckLayer =
+          effectiveToLayer === graphMaxLayer || effectiveFromLayer === graphMaxLayer
+            ? graphMaxLayer
+            : maxLayer - 1;
 
-        for (let l = minLayer + 1; l < maxLayer; l++) {
+        for (let l = minLayer + 1; l <= maxCheckLayer; l++) {
           const stopsAtLayer = layerStops.get(l) || [];
           for (const sid of stopsAtLayer) {
-            if (!stops.includes(sid) && (stopLanes.get(sid) ?? 0) === fromLane) {
+            if (!stops.includes(sid)) {
               isExpress = true;
               break;
             }
