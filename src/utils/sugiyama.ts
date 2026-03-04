@@ -360,7 +360,7 @@ function assignLanes(
       const toLayer = layers.get(toStop);
 
       if (fromLayer !== undefined && toLayer !== undefined) {
-        let minLayer = Math.min(fromLayer, toLayer);
+        const minLayer = Math.min(fromLayer, toLayer);
         let maxLayer = Math.max(fromLayer, toLayer);
 
         const graphMaxLayer = getMaxLayer(layers);
@@ -380,15 +380,34 @@ function assignLanes(
     tripExpressConnections.set(trip.id, expressConns);
   });
 
+  // Pre-compute how many trips use each stop (for tiebreaker: prefer majority route for lane 0)
+  const stopToTripCount = new Map<string, number>();
+  trips.forEach((trip) => {
+    const stops = tripStopsMap.get(trip.id) || [];
+    stops.forEach((stopId) => {
+      stopToTripCount.set(stopId, (stopToTripCount.get(stopId) || 0) + 1);
+    });
+  });
+  const getSharedStopScore = (tripId: string): number => {
+    const stops = tripStopsMap.get(tripId) || [];
+    return stops.reduce(
+      (sum, stopId) => sum + (stopToTripCount.get(stopId) || 0),
+      0,
+    );
+  };
+
   // Process local (non-express, longer) trips first so they get lane 0; express trips get higher lanes
   // so shared stops sit on the main line and express bypass is visible.
+  // When same length and express status, prefer trip whose stops are shared by more other trips (majority route).
   const sortedTrips = [...trips].sort((a, b) => {
     const aStops = tripStopsMap.get(a.id) || [];
     const bStops = tripStopsMap.get(b.id) || [];
     const aHasExpress = (tripExpressConnections.get(a.id) || []).length > 0;
     const bHasExpress = (tripExpressConnections.get(b.id) || []).length > 0;
     if (aHasExpress !== bHasExpress) return aHasExpress ? 1 : -1;
-    return bStops.length - aStops.length;
+    const lenDiff = bStops.length - aStops.length;
+    if (lenDiff !== 0) return lenDiff;
+    return getSharedStopScore(b.id) - getSharedStopScore(a.id);
   });
 
   sortedTrips.forEach((trip) => {

@@ -15,7 +15,9 @@ export interface PathGenerationOptions {
 /**
  * Generate a single segment path from prevStop center to nextStop center
  * using octilinear routing (express detours, 90-degree turns, end-stop routing).
- * Cross-lane segments merge directly at destination (no mid-path L-turn).
+ * Cross-lane segments use direction-aware L-turn: vertical-first when entering
+ * a branch (avoids crossing same-layer stops on the main line), horizontal-first
+ * when leaving a branch.
  */
 const generateSegmentPathPoints = (
   prevPos: { x: number; y: number },
@@ -62,9 +64,18 @@ const generateSegmentPathPoints = (
         path.push([endStopX, prevPos.y, 0]);
         path.push([endStopX, nextPos.y, 0]);
       } else {
-        // Merge directly at destination (no L-turn in the middle)
-        path.push([nextPos.x, prevPos.y, 0]);
-        path.push([nextPos.x, nextPos.y, 0]);
+        // Direction-aware L-turn: entering branch = vertical first (merge at source);
+        // leaving branch = horizontal first (merge at destination).
+        const distPrevFromBase = Math.abs(prevPos.y - baseY);
+        const distNextFromBase = Math.abs(nextPos.y - baseY);
+        const enteringBranch = distNextFromBase > distPrevFromBase;
+        if (enteringBranch) {
+          path.push([prevPos.x, nextPos.y, 0]);
+          path.push([nextPos.x, nextPos.y, 0]);
+        } else {
+          path.push([nextPos.x, prevPos.y, 0]);
+          path.push([nextPos.x, nextPos.y, 0]);
+        }
       }
     }
   }
